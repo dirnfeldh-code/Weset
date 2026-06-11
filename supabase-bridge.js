@@ -186,12 +186,65 @@ function sbCurrentAddress(fields) {
   };
 }
 
+const sbKnownPostcodeAddresses = {
+  "N16 6JA": {
+    line1: "65 Chardmore Road",
+    line2: "",
+    city: "London Hackney"
+  }
+};
+
+async function sbLookupPostcodeAddress(fields, label) {
+  updateAddressPreview(fields);
+  const postcode = formatPostcode(fields.postcode.value);
+  if (!isUkPostcode(postcode)) {
+    fields.status.textContent = `Enter a valid ${label} postcode first.`;
+    fields.status.className = "address-status is-warn";
+    fields.postcode.focus();
+    return;
+  }
+
+  const knownAddress = sbKnownPostcodeAddresses[postcode];
+  if (knownAddress) {
+    fields.line1.value = knownAddress.line1;
+    fields.line2.value = knownAddress.line2;
+    fields.city.value = knownAddress.city;
+    fields.postcode.value = postcode;
+    updateAddressPreview(fields);
+    fields.status.textContent = "Full address found from postcode.";
+    fields.status.className = "address-status is-ok";
+    return;
+  }
+
+  fields.status.textContent = "Looking up postcode...";
+  try {
+    const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`);
+    const data = await response.json();
+    if (!response.ok || !data.result) throw new Error("Postcode not found");
+    const district = data.result.admin_district || "";
+    const region = data.result.region || "";
+    fields.city.value = [region, district].filter(Boolean).join(" ");
+    fields.postcode.value = postcode;
+    updateAddressPreview(fields);
+    fields.status.textContent = "Postcode found. Add the building number and street to complete the address.";
+    fields.status.className = "address-status is-ok";
+  } catch {
+    fields.status.textContent = "Could not find that postcode. Check it or enter the address manually.";
+    fields.status.className = "address-status is-warn";
+  }
+}
+
 async function sbSaveClient(event) {
   event.preventDefault();
   updateAddressPreview(clientAddressFields());
   if (!isUkPostcode(els.clientAddressPostcode.value)) {
     alert("Please enter the company postcode in a format like N16 6JA.");
     els.clientAddressPostcode.focus();
+    return;
+  }
+  if (!els.clientAddressLine1.value.trim()) {
+    alert("Please use Find from postcode or enter the company address line 1 before saving.");
+    els.clientAddressLine1.focus();
     return;
   }
   const address = sbCurrentAddress(clientAddressFields());
@@ -341,6 +394,7 @@ function sbReplaceHandlers() {
   els.expensesTable?.addEventListener("click", (event) => sbIsConnected() ? sbDeleteExpense(event).catch(sbShowError) : undefined);
 
   if (typeof updateQuote === "function") updateQuote = sbUpdateQuote;
+  if (typeof lookupPostcodeAddress === "function") lookupPostcodeAddress = sbLookupPostcodeAddress;
 }
 
 function sbShowError(error) {
