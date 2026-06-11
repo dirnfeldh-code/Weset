@@ -94,10 +94,11 @@ async function sbLoadAll() {
     sbRequest("app_users?select=*&order=created_at.asc")
   ]);
   state.clients = clients.map(sbClientFromRow);
-  state.catalog = typeof mergeCatalog === "function" ? mergeCatalog(items.map(sbItemFromRow)) : items.map(sbItemFromRow);
+  state.catalog = items.map(sbItemFromRow);
   state.expenses = expenses.map(sbExpenseFromRow);
-  state.users = typeof mergeUsers === "function" ? mergeUsers(appUsers.map(sbUserFromRow)) : appUsers.map(sbUserFromRow);
+  state.users = appUsers.map(sbUserFromRow);
   state.quotes = quotes.map((quote) => sbQuoteFromRow(quote, quoteItems.filter((item) => item.quote_id === quote.id)));
+  selectedQuoteItems = [];
   saveState();
 }
 
@@ -373,6 +374,18 @@ async function sbUpdateQuote(id, patch) {
   render();
 }
 
+function sbResetQuoteForm() {
+  els.quoteForm.reset();
+  const availableItems = state.catalog || [];
+  selectedQuoteItems = ["desk", "task-chair", "onsite-setup"]
+    .map((id) => availableItems.find((item) => item.id === id || item.code === id.toUpperCase()))
+    .filter(Boolean)
+    .map((item) => ({ ...item, quantity: item.id === "onsite-setup" ? 3 : 24 }));
+  document.querySelector("#requiredDate").value = todayPlus(21);
+  updateAddressPreview(setupAddressFields());
+  renderSelectedItems();
+}
+
 function sbIsUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
 }
@@ -395,6 +408,7 @@ function sbReplaceHandlers() {
 
   if (typeof updateQuote === "function") updateQuote = sbUpdateQuote;
   if (typeof lookupPostcodeAddress === "function") lookupPostcodeAddress = sbLookupPostcodeAddress;
+  if (typeof resetQuoteForm === "function") resetQuoteForm = sbResetQuoteForm;
 }
 
 function sbShowError(error) {
