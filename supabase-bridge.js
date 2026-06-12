@@ -202,6 +202,27 @@ function sbUserFromRow(row) {
 
 let sbEditingItemId = "";
 
+function sbEscapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function sbFormatMoney(value) {
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(value || 0);
+}
+
+function sbClassName(value) {
+  return String(value || "").replaceAll(" ", "-");
+}
+
+function sbEmpty(message) {
+  return `<div class="empty">${sbEscapeHtml(message)}</div>`;
+}
+
 function sbCurrentAddress(fields) {
   return {
     address_line1: fields.line1.value.trim(),
@@ -418,14 +439,14 @@ function sbRenderItems() {
   const items = (state.catalog || []).filter((item) => !query || Object.values(item).join(" ").toLowerCase().includes(query));
   els.catalogList.innerHTML = items.map((item) => `<article class="catalog-item">
     <div>
-      <h3>${escapeHtml(item.name)}</h3>
-      <p class="meta">${escapeHtml(item.description)}<br>${escapeHtml(item.supplier)} | ${escapeHtml(item.code)} | ${escapeHtml(item.leadTime)}</p>
+      <h3>${sbEscapeHtml(item.name)}</h3>
+      <p class="meta">${sbEscapeHtml(item.description)}<br>${sbEscapeHtml(item.supplier)} | ${sbEscapeHtml(item.code)} | ${sbEscapeHtml(item.leadTime)}</p>
       <div class="card-actions">
         <button class="secondary" data-edit-item="${item.id}" type="button">Edit</button>
       </div>
     </div>
-    <div><span class="badge ${className(item.category)}">${escapeHtml(item.category)}</span><strong>${formatMoney(item.unitCost)}</strong><p class="meta">${escapeHtml(item.unit)}</p></div>
-  </article>`).join("") || empty("No items in Supabase yet.");
+    <div><span class="badge ${sbClassName(item.category)}">${sbEscapeHtml(item.category)}</span><strong>${sbFormatMoney(item.unitCost)}</strong><p class="meta">${sbEscapeHtml(item.unit)}</p></div>
+  </article>`).join("") || sbEmpty("No items in Supabase yet.");
 }
 
 function sbOpenItemEditor(id) {
