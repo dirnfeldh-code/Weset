@@ -93,13 +93,35 @@ async function sbLoadAll() {
     sbRequest("expenses?select=*&order=expense_date.desc"),
     sbRequest("app_users?select=*&order=created_at.asc")
   ]);
+  const itemRows = await sbEnsureDefaultItems(items);
   state.clients = clients.map(sbClientFromRow);
-  state.catalog = items.map(sbItemFromRow);
+  state.catalog = itemRows.map(sbItemFromRow);
   state.expenses = expenses.map(sbExpenseFromRow);
   state.users = appUsers.map(sbUserFromRow);
   state.quotes = quotes.map((quote) => sbQuoteFromRow(quote, quoteItems.filter((item) => item.quote_id === quote.id)));
   selectedQuoteItems = [];
   saveState();
+}
+
+async function sbEnsureDefaultItems(existingRows) {
+  if (!Array.isArray(defaultCatalog)) return existingRows;
+  const existingCodes = new Set(existingRows.map((row) => String(row.product_code || "").toUpperCase()).filter(Boolean));
+  const missing = defaultCatalog
+    .filter((item) => !existingCodes.has(String(item.code || "").toUpperCase()))
+    .map((item) => ({
+      name: item.name,
+      category: item.category,
+      unit_cost: Number(item.unitCost || 0),
+      unit: item.unit || "each",
+      default_quantity: Number(item.defaultQuantity || 1),
+      supplier: item.supplier || "",
+      product_code: item.code || item.id,
+      lead_time: item.leadTime || "",
+      description: item.description || ""
+    }));
+  if (!missing.length) return existingRows;
+  const inserted = await sbRequest("items", { method: "POST", body: missing });
+  return [...existingRows, ...inserted];
 }
 
 function sbClientFromRow(row) {
@@ -177,6 +199,8 @@ function sbUserFromRow(row) {
     active: row.active !== false
   };
 }
+
+let sbEditingItemId = "";
 
 function sbCurrentAddress(fields) {
   return {
@@ -270,24 +294,27 @@ async function sbSaveClient(event) {
 
 async function sbSaveItem(event) {
   event.preventDefault();
-  const [saved] = await sbRequest("items", {
-    method: "POST",
-    body: {
-      name: document.querySelector("#itemName").value.trim(),
-      category: document.querySelector("#itemCategory").value,
-      unit_cost: Number(document.querySelector("#itemUnitCost").value),
-      unit: document.querySelector("#itemUnit").value,
-      default_quantity: Number(document.querySelector("#itemDefaultQuantity").value),
-      supplier: document.querySelector("#itemSupplier").value.trim(),
-      product_code: document.querySelector("#itemCode").value.trim(),
-      lead_time: document.querySelector("#itemLeadTime").value.trim(),
-      description: document.querySelector("#itemDescription").value.trim()
-    }
-  });
+  const body = {
+    name: document.querySelector("#itemName").value.trim(),
+    category: document.querySelector("#itemCategory").value,
+    unit_cost: Number(document.querySelector("#itemUnitCost").value),
+    unit: document.querySelector("#itemUnit").value,
+    default_quantity: Number(document.querySelector("#itemDefaultQuantity").value),
+    supplier: document.querySelector("#itemSupplier").value.trim(),
+    product_code: document.querySelector("#itemCode").value.trim(),
+    lead_time: document.querySelector("#itemLeadTime").value.trim(),
+    description: document.querySelector("#itemDescription").value.trim()
+  };
+  const [saved] = sbEditingItemId
+    ? await sbRequest(`items?id=eq.${sbEditingItemId}`, { method: "PATCH", body })
+    : await sbRequest("items", { method: "POST", body });
   const item = sbItemFromRow(saved);
-  state.catalog.push(item);
+  state.catalog = sbEditingItemId
+    ? state.catalog.map((existing) => existing.id === item.id ? item : existing)
+    : [...state.catalog, item];
   if (document.querySelector("#addItemToCurrentQuote").checked) selectedQuoteItems.push({ ...item, quantity: item.defaultQuantity });
   saveState();
+  sbEditingItemId = "";
   els.itemForm.reset();
   els.itemDialog.close();
   render();
@@ -386,6 +413,46 @@ function sbResetQuoteForm() {
   renderSelectedItems();
 }
 
+function sbRenderItems() {
+  const query = els.searchInput.value.trim().toLowerCase();
+  const items = (state.catalog || []).filter((item) => !query || Object.values(item).join(" ").toLowerCase().includes(query));
+  els.catalogList.innerHTML = items.map((item) => `<article class="catalog-item">
+    <div>
+      <h3>${escapeHtml(item.name)}</h3>
+      <p class="meta">${escapeHtml(item.description)}<br>${escapeHtml(item.supplier)} | ${escapeHtml(item.code)} | ${escapeHtml(item.leadTime)}</p>
+      <div class="card-actions">
+        <button class="secondary" data-edit-item="${item.id}" type="button">Edit</button>
+      </div>
+    </div>
+    <div><span class="badge ${className(item.category)}">${escapeHtml(item.category)}</span><strong>${formatMoney(item.unitCost)}</strong><p class="meta">${escapeHtml(item.unit)}</p></div>
+  </article>`).join("") || empty("No items in Supabase yet.");
+}
+
+function sbOpenItemEditor(id) {
+  const item = (state.catalog || []).find((entry) => entry.id === id);
+  if (!item) return;
+  sbEditingItemId = id;
+  els.itemForm.reset();
+  document.querySelector("#itemName").value = item.name || "";
+  document.querySelector("#itemCategory").value = item.category || "Custom";
+  document.querySelector("#itemUnitCost").value = Number(item.unitCost || 0);
+  document.querySelector("#itemUnit").value = item.unit || "each";
+  document.querySelector("#itemDefaultQuantity").value = Number(item.defaultQuantity || 1);
+  document.querySelector("#itemSupplier").value = item.supplier || "";
+  document.querySelector("#itemCode").value = item.code || "";
+  document.querySelector("#itemLeadTime").value = item.leadTime || "";
+  document.querySelector("#itemDescription").value = item.description || "";
+  document.querySelector("#addItemToCurrentQuote").checked = false;
+  els.itemDialog.showModal();
+}
+
+function sbOpenNewItem(addToQuote) {
+  sbEditingItemId = "";
+  els.itemForm.reset();
+  document.querySelector("#addItemToCurrentQuote").checked = addToQuote;
+  els.itemDialog.showModal();
+}
+
 function sbIsUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
 }
@@ -405,10 +472,16 @@ function sbReplaceHandlers() {
   els.itemForm.addEventListener("submit", (event) => sbIsConnected() ? sbSaveItem(event).catch(sbShowError) : undefined);
   els.expenseForm?.addEventListener("submit", (event) => sbIsConnected() ? sbSaveExpense(event).catch(sbShowError) : undefined);
   els.expensesTable?.addEventListener("click", (event) => sbIsConnected() ? sbDeleteExpense(event).catch(sbShowError) : undefined);
+  els.catalogList?.addEventListener("click", (event) => {
+    const id = event.target.dataset.editItem;
+    if (id) sbOpenItemEditor(id);
+  });
 
   if (typeof updateQuote === "function") updateQuote = sbUpdateQuote;
   if (typeof lookupPostcodeAddress === "function") lookupPostcodeAddress = sbLookupPostcodeAddress;
   if (typeof resetQuoteForm === "function") resetQuoteForm = sbResetQuoteForm;
+  if (typeof renderItems === "function") renderItems = sbRenderItems;
+  if (typeof openItemDialog === "function") openItemDialog = sbOpenNewItem;
 }
 
 function sbShowError(error) {
