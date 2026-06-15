@@ -235,6 +235,48 @@ function sbCurrentAddress(fields) {
   };
 }
 
+function sbSetAddressMessage(fields, message, type = "is-warn", focusField = null) {
+  if (fields?.status) {
+    fields.status.textContent = message;
+    fields.status.className = `address-status ${type}`.trim();
+  }
+  if (focusField?.focus) focusField.focus();
+}
+
+function sbRequireSignedIn(event, message = "Please log in first. Your data is saved in Supabase only after you are signed in.") {
+  event?.preventDefault();
+  if (els.loginError && !sbIsConnected()) els.loginError.textContent = message;
+  if (!sbIsConnected()) alert(message);
+  return sbIsConnected();
+}
+
+function sbValidateAddress(fields, label) {
+  updateAddressPreview(fields);
+  const line1 = fields.line1.value.trim();
+  const city = fields.city.value.trim();
+  const postcode = formatPostcode(fields.postcode.value);
+  fields.postcode.value = postcode;
+
+  if (!postcode) {
+    sbSetAddressMessage(fields, `Enter the ${label} postcode first.`, "is-warn", fields.postcode);
+    return false;
+  }
+  if (!isUkPostcode(postcode)) {
+    sbSetAddressMessage(fields, `The ${label} postcode is not valid. Use a format like N16 6JA.`, "is-warn", fields.postcode);
+    return false;
+  }
+  if (!line1) {
+    sbSetAddressMessage(fields, `Enter the ${label} address line 1. Use Find from postcode if you want help.`, "is-warn", fields.line1);
+    return false;
+  }
+  if (!city) {
+    sbSetAddressMessage(fields, `Enter the ${label} town or city.`, "is-warn", fields.city);
+    return false;
+  }
+  sbSetAddressMessage(fields, `${label[0].toUpperCase()}${label.slice(1)} address looks ready to save.`, "is-ok");
+  return true;
+}
+
 const sbKnownPostcodeAddresses = {
   "N16 6JA": {
     line1: "65 Chardmore Road",
@@ -309,18 +351,10 @@ function sbCheckSetupAddressOnGoogleMaps() {
 
 async function sbSaveClient(event) {
   event.preventDefault();
-  updateAddressPreview(clientAddressFields());
-  if (!isUkPostcode(els.clientAddressPostcode.value)) {
-    alert("Please enter the company postcode in a format like N16 6JA.");
-    els.clientAddressPostcode.focus();
-    return;
-  }
-  if (!els.clientAddressLine1.value.trim()) {
-    alert("Please use Find from postcode or enter the company address line 1 before saving.");
-    els.clientAddressLine1.focus();
-    return;
-  }
-  const address = sbCurrentAddress(clientAddressFields());
+  if (!sbRequireSignedIn(event)) return;
+  const clientFields = clientAddressFields();
+  if (!sbValidateAddress(clientFields, "company")) return;
+  const address = sbCurrentAddress(clientFields);
   const [saved] = await sbRequest("clients", {
     method: "POST",
     body: {
@@ -370,15 +404,21 @@ async function sbSaveItem(event) {
 
 async function sbSaveQuote(event) {
   event.preventDefault();
-  updateAddressPreview(setupAddressFields());
-  if (!selectedQuoteItems.length) return alert("Add at least one item or service to the quote.");
-  if (!isUkPostcode(els.addressPostcode.value)) {
-    alert("Please enter a UK postcode in a format like N16 6JA.");
-    els.addressPostcode.focus();
+  if (!sbRequireSignedIn(event)) return;
+  const setupFields = setupAddressFields();
+  if (!selectedQuoteItems.length) {
+    sbSetAddressMessage(setupFields, "Add at least one item or service before saving the quote.", "is-warn");
+    alert("Add at least one item or service before saving the quote.");
+    return;
+  }
+  if (!sbValidateAddress(setupFields, "setup")) return;
+  if (!els.quoteClient.value) {
+    sbSetAddressMessage(setupFields, "Choose a client before saving the quote.", "is-warn", els.quoteClient);
+    alert("Choose a client before saving the quote.");
     return;
   }
   const costs = quoteCosts({ items: selectedQuoteItems });
-  const address = sbCurrentAddress(setupAddressFields());
+  const address = sbCurrentAddress(setupFields);
   const [savedQuote] = await sbRequest("quotes", {
     method: "POST",
     body: {
@@ -533,10 +573,10 @@ function sbReplaceHandlers() {
   if (typeof checkAddressOnGoogleMaps === "function") document.querySelector("#checkAddressBtn")?.removeEventListener("click", checkAddressOnGoogleMaps);
 
   els.loginForm.addEventListener("submit", sbLogin);
-  els.clientForm.addEventListener("submit", (event) => sbIsConnected() ? sbSaveClient(event).catch(sbShowError) : undefined);
-  els.quoteForm.addEventListener("submit", (event) => sbIsConnected() ? sbSaveQuote(event).catch(sbShowError) : undefined);
-  els.itemForm.addEventListener("submit", (event) => sbIsConnected() ? sbSaveItem(event).catch(sbShowError) : undefined);
-  els.expenseForm?.addEventListener("submit", (event) => sbIsConnected() ? sbSaveExpense(event).catch(sbShowError) : undefined);
+  els.clientForm.addEventListener("submit", (event) => sbSaveClient(event).catch(sbShowError));
+  els.quoteForm.addEventListener("submit", (event) => sbSaveQuote(event).catch(sbShowError));
+  els.itemForm.addEventListener("submit", (event) => sbIsConnected() ? sbSaveItem(event).catch(sbShowError) : sbRequireSignedIn(event));
+  els.expenseForm?.addEventListener("submit", (event) => sbIsConnected() ? sbSaveExpense(event).catch(sbShowError) : sbRequireSignedIn(event));
   els.expensesTable?.addEventListener("click", (event) => sbIsConnected() ? sbDeleteExpense(event).catch(sbShowError) : undefined);
   document.querySelector("#checkAddressBtn")?.addEventListener("click", sbCheckSetupAddressOnGoogleMaps);
   els.catalogList?.addEventListener("click", (event) => {
@@ -555,7 +595,9 @@ function sbReplaceHandlers() {
 
 function sbShowError(error) {
   console.warn(error);
-  alert(`Supabase could not save this yet: ${error.message}`);
+  const message = `Could not save yet: ${error.message || "Please check the form and try again."}`;
+  if (typeof activeView !== "undefined" && activeView === "quotes") sbSetAddressMessage(setupAddressFields(), message, "is-warn");
+  alert(message);
 }
 
 sbReplaceHandlers();
