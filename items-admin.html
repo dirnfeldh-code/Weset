@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WeSet | Items</title>
+  </head>
+  <body>
+    <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
+    <script>
+      const version = "20260615-items4";
+      const source = "live.html?source=" + version;
+      fetch(source)
+        .then((response) => response.ok ? response.text() : fetch("index.html?source=" + version).then((fallback) => fallback.text()))
+        .then((html) => {
+          html = html
+            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
+            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
+            .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`);
+          document.open();
+          document.write(html);
+          document.close();
+          if (!location.hash) location.hash = "items";
+        })
+        .catch(() => {
+          document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 18px;'>Could not load WeSet. Please refresh.</p>";
+        });
+    </script>
+  </body>
+</html>
