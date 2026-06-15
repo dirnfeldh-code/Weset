@@ -105,22 +105,25 @@ async function sbLoadAll() {
 
 async function sbEnsureDefaultItems(existingRows) {
   if (!Array.isArray(defaultCatalog)) return existingRows;
-  const existingCodes = new Set(existingRows.map((row) => String(row.product_code || "").toUpperCase()).filter(Boolean));
-  const missing = defaultCatalog
-    .filter((item) => !existingCodes.has(String(item.code || "").toUpperCase()))
-    .map((item) => ({
-      name: item.name,
-      category: item.category,
-      unit_cost: Number(item.unitCost || 0),
-      unit: item.unit || "each",
-      default_quantity: Number(item.defaultQuantity || 1),
-      supplier: item.supplier || "",
-      product_code: item.code || item.id,
-      lead_time: item.leadTime || "",
-      description: item.description || ""
-    }));
-  if (!missing.length) return existingRows;
-  const inserted = await sbRequest("items", { method: "POST", body: missing });
+  const seedKey = "weset.supabase.itemsSeeded";
+  if (existingRows.length) {
+    localStorage.setItem(seedKey, "true");
+    return existingRows;
+  }
+  if (localStorage.getItem(seedKey) === "true") return existingRows;
+  const starterItems = defaultCatalog.map((item) => ({
+    name: item.name,
+    category: item.category,
+    unit_cost: Number(item.unitCost || 0),
+    unit: item.unit || "each",
+    default_quantity: Number(item.defaultQuantity || 1),
+    supplier: item.supplier || "",
+    product_code: item.code || item.id,
+    lead_time: item.leadTime || "",
+    description: item.description || ""
+  }));
+  const inserted = await sbRequest("items", { method: "POST", body: starterItems });
+  localStorage.setItem(seedKey, "true");
   return [...existingRows, ...inserted];
 }
 
@@ -413,6 +416,20 @@ async function sbDeleteExpense(event) {
   renderAccounting();
 }
 
+async function sbDeleteItem(id) {
+  const item = (state.catalog || []).find((entry) => entry.id === id);
+  if (!item) return;
+  if (!confirm(`Delete ${item.name}? This removes it from the item catalogue.`)) return;
+  if (sbIsConnected() && sbIsUuid(id)) {
+    await sbRequest(`quote_items?item_id=eq.${id}`, { method: "PATCH", body: { item_id: null } });
+    await sbRequest(`items?id=eq.${id}`, { method: "DELETE" });
+  }
+  state.catalog = (state.catalog || []).filter((entry) => entry.id !== id);
+  selectedQuoteItems = selectedQuoteItems.filter((entry) => entry.id !== id);
+  saveState();
+  render();
+}
+
 async function sbUpdateQuote(id, patch) {
   if (sbIsConnected() && sbIsUuid(id) && patch.status) {
     await sbRequest(`quotes?id=eq.${id}`, { method: "PATCH", body: { status: patch.status } });
@@ -443,6 +460,7 @@ function sbRenderItems() {
       <p class="meta">${sbEscapeHtml(item.description)}<br>${sbEscapeHtml(item.supplier)} | ${sbEscapeHtml(item.code)} | ${sbEscapeHtml(item.leadTime)}</p>
       <div class="card-actions">
         <button class="secondary" data-edit-item="${item.id}" type="button">Edit</button>
+        <button class="ghost danger" data-delete-item="${item.id}" type="button">Delete</button>
       </div>
     </div>
     <div><span class="badge ${sbClassName(item.category)}">${sbEscapeHtml(item.category)}</span><strong>${sbFormatMoney(item.unitCost)}</strong><p class="meta">${sbEscapeHtml(item.unit)}</p></div>
@@ -454,6 +472,7 @@ function sbOpenItemEditor(id) {
   if (!item) return;
   sbEditingItemId = id;
   els.itemForm.reset();
+  els.itemDialog.querySelector("h2").textContent = "Edit item";
   document.querySelector("#itemName").value = item.name || "";
   document.querySelector("#itemCategory").value = item.category || "Custom";
   document.querySelector("#itemUnitCost").value = Number(item.unitCost || 0);
@@ -470,6 +489,7 @@ function sbOpenItemEditor(id) {
 function sbOpenNewItem(addToQuote) {
   sbEditingItemId = "";
   els.itemForm.reset();
+  els.itemDialog.querySelector("h2").textContent = "Create item";
   document.querySelector("#addItemToCurrentQuote").checked = addToQuote;
   els.itemDialog.showModal();
 }
@@ -494,8 +514,10 @@ function sbReplaceHandlers() {
   els.expenseForm?.addEventListener("submit", (event) => sbIsConnected() ? sbSaveExpense(event).catch(sbShowError) : undefined);
   els.expensesTable?.addEventListener("click", (event) => sbIsConnected() ? sbDeleteExpense(event).catch(sbShowError) : undefined);
   els.catalogList?.addEventListener("click", (event) => {
-    const id = event.target.dataset.editItem;
-    if (id) sbOpenItemEditor(id);
+    const editButton = event.target.closest("[data-edit-item]");
+    const deleteButton = event.target.closest("[data-delete-item]");
+    if (editButton) sbOpenItemEditor(editButton.dataset.editItem);
+    if (deleteButton) sbDeleteItem(deleteButton.dataset.deleteItem).catch(sbShowError);
   });
 
   if (typeof updateQuote === "function") updateQuote = sbUpdateQuote;
