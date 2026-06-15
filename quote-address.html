@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WeSet | Quote Address</title>
+  </head>
+  <body>
+    <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
+    <script>
+      const version = "20260615-address1";
+      fetch("live.html?source=" + version)
+        .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
+        .then((html) => {
+          html = html
+            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
+            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
+            .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`);
+          document.open();
+          document.write(html);
+          document.close();
+          location.hash = "quotes";
+        })
+        .catch(() => {
+          document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 18px;'>Could not load WeSet. Please refresh.</p>";
+        });
+    </script>
+  </body>
+</html>
