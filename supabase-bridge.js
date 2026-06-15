@@ -283,6 +283,30 @@ async function sbLookupPostcodeAddress(fields, label) {
   }
 }
 
+function sbCheckSetupAddressOnGoogleMaps() {
+  const fields = setupAddressFields();
+  const address = updateAddressPreview(fields);
+  if (!address) {
+    fields.status.textContent = "Enter the setup address before checking Google Maps.";
+    fields.status.className = "address-status is-warn";
+    fields.line1.focus();
+    return;
+  }
+
+  if (!isUkPostcode(fields.postcode.value)) {
+    fields.status.textContent = "Enter a valid setup postcode before checking Google Maps.";
+    fields.status.className = "address-status is-warn";
+    fields.postcode.focus();
+    return;
+  }
+
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  const opened = window.open(mapsUrl, "_blank", "noopener");
+  if (!opened) window.location.href = mapsUrl;
+  fields.status.textContent = "Google Maps opened with the setup address.";
+  fields.status.className = "address-status is-ok";
+}
+
 async function sbSaveClient(event) {
   event.preventDefault();
   updateAddressPreview(clientAddressFields());
@@ -506,6 +530,7 @@ function sbReplaceHandlers() {
   if (typeof saveItem === "function") els.itemForm.removeEventListener("submit", saveItem);
   if (typeof saveExpense === "function") els.expenseForm?.removeEventListener("submit", saveExpense);
   if (typeof deleteExpense === "function") els.expensesTable?.removeEventListener("click", deleteExpense);
+  if (typeof checkAddressOnGoogleMaps === "function") document.querySelector("#checkAddressBtn")?.removeEventListener("click", checkAddressOnGoogleMaps);
 
   els.loginForm.addEventListener("submit", sbLogin);
   els.clientForm.addEventListener("submit", (event) => sbIsConnected() ? sbSaveClient(event).catch(sbShowError) : undefined);
@@ -513,6 +538,7 @@ function sbReplaceHandlers() {
   els.itemForm.addEventListener("submit", (event) => sbIsConnected() ? sbSaveItem(event).catch(sbShowError) : undefined);
   els.expenseForm?.addEventListener("submit", (event) => sbIsConnected() ? sbSaveExpense(event).catch(sbShowError) : undefined);
   els.expensesTable?.addEventListener("click", (event) => sbIsConnected() ? sbDeleteExpense(event).catch(sbShowError) : undefined);
+  document.querySelector("#checkAddressBtn")?.addEventListener("click", sbCheckSetupAddressOnGoogleMaps);
   els.catalogList?.addEventListener("click", (event) => {
     const editButton = event.target.closest("[data-edit-item]");
     const deleteButton = event.target.closest("[data-delete-item]");
