@@ -16,4 +16,31 @@
         ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(`${value}T00:00:00`))
         : "No date";
   }
+
+  const dialogCloseMap = {
+    closeClientDialog: "clientDialog",
+    closeUserDialog: "userDialog",
+    closeItemDialog: "itemDialog",
+    closeQuoteDialog: "quoteDialog"
+  };
+
+  document.addEventListener("click", (event) => {
+    const closeButton = event.target.closest?.("#closeClientDialog, #closeUserDialog, #closeItemDialog, #closeQuoteDialog");
+    if (closeButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const dialog = document.getElementById(dialogCloseMap[closeButton.id]);
+      if (dialog?.open) dialog.close();
+      return;
+    }
+
+    const removeButton = event.target.closest?.("#selectedItems [data-remove-item]");
+    if (removeButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof removeSelectedItem === "function") {
+        removeSelectedItem({ target: removeButton });
+      }
+    }
+  }, true);
 })();
