@@ -8,7 +8,7 @@
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
     <script>
-      const version = "20260616-loginfix1";
+      const version = "20260616-display1";
       const hash = location.hash || "#dashboard";
       fetch("live.html?source=" + version)
         .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
@@ -17,7 +17,7 @@
             .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
             .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
             .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
-            .replace("</body>", `<script src="users-fix.js?v=${version}"><\/script><script src="password-reset.js?v=${version}"><\/script></body>`);
+            .replace("</body>", `<script src="users-fix.js?v=${version}"><\/script><script src="password-reset.js?v=${version}"><\/script><script src="login-fix.js?v=${version}"><\/script><script src="display-fix.js?v=${version}"><\/script></body>`);
           document.open();
           document.write(html);
           document.close();
