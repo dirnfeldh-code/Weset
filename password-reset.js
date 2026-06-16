@@ -76,7 +76,7 @@
 
   function addLoginFix() {
     const form = document.querySelector("#loginForm");
-    if (!form || form.dataset.loginFix === "true") return;
+    if (!form || window.wesetLoginFix === true) return;
     form.dataset.loginFix = "true";
     window.wesetLoginFix = true;
     form.addEventListener("submit", async (event) => {
