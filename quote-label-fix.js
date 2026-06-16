@@ -31,6 +31,58 @@
     return typeof className === "function" ? className(value) : typeof cls === "function" ? cls(value) : String(value || "").replaceAll(" ", "-");
   }
 
+  function clearQuoteFormNow() {
+    const form = document.querySelector("#quoteForm");
+    if (form) form.reset();
+
+    if (typeof selectedQuoteItems !== "undefined") {
+      const defaults = ["desk", "task-chair", "onsite-setup"];
+      selectedQuoteItems = defaults
+        .map((id) => (state.catalog || []).find((item) => item.id === id || item.code === id.toUpperCase()))
+        .filter(Boolean)
+        .map((item) => ({ ...item, quantity: item.id === "onsite-setup" || item.code === "ONSITE-SETUP" ? 3 : 24 }));
+    }
+
+    const requiredDate = document.querySelector("#requiredDate");
+    if (requiredDate && typeof todayPlus === "function") requiredDate.value = todayPlus(21);
+
+    ["#addressLine1", "#addressLine2", "#addressCity", "#addressPostcode", "#premises", "#quoteNotes"].forEach((selector) => {
+      const field = document.querySelector(selector);
+      if (field) field.value = "";
+    });
+
+    const preview = document.querySelector("#addressPreview");
+    if (preview) preview.textContent = "No setup address entered yet.";
+    const status = document.querySelector("#addressStatus");
+    if (status) {
+      status.textContent = "Enter the setup postcode, then use Find from postcode.";
+      status.className = "address-status";
+    }
+
+    if (typeof renderSelectedItems === "function") renderSelectedItems();
+    if (typeof renderCatalogSelect === "function") renderCatalogSelect();
+  }
+
+  function runQuoteAddressButton(id) {
+    if (id === "resetQuoteFormBtn") return clearQuoteFormNow();
+    if (id === "lookupAddressBtn" && typeof lookupPostcodeAddress === "function" && typeof setupAddressFields === "function") return lookupPostcodeAddress(setupAddressFields(), "setup");
+    if (id === "lookupClientAddressBtn" && typeof lookupPostcodeAddress === "function" && typeof clientAddressFields === "function") return lookupPostcodeAddress(clientAddressFields(), "company");
+    if (id === "checkAddressBtn" && typeof checkAddressOnGoogleMaps === "function") return checkAddressOnGoogleMaps();
+  }
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest?.("#resetQuoteFormBtn, #lookupAddressBtn, #lookupClientAddressBtn, #checkAddressBtn");
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      const result = runQuoteAddressButton(button.id);
+      if (result?.catch) result.catch((error) => alert(`Button could not finish: ${error.message || "Please try again."}`));
+    } catch (error) {
+      alert(`Button could not finish: ${error.message || "Please try again."}`);
+    }
+  }, true);
+
   if (typeof renderQuoteCard === "function") {
     renderQuoteCard = function friendlyRenderQuoteCard(quote) {
       const client = getClient(quote.clientId);
