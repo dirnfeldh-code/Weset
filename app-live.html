@@ -14,7 +14,7 @@
         .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
         .then((html) => {
           html = html
-            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}`)
+            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
             .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
             .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
             .replace("</body>", `<script src="users-fix.js?v=${version}"><\/script><script src="password-reset.js?v=${version}"><\/script><script src="login-fix.js?v=${version}"><\/script><script src="compat-fix.js?v=${version}"><\/script><script src="display-fix.js?v=${version}"><\/script></body>`);
