@@ -7,6 +7,16 @@
     .replaceAll("'", "&#039;");
 
   const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+  const postcodeRegex = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+
+  const knownPostcodes = {
+    "N16 6JA": {
+      line1: "65 Chardmore Road",
+      line2: "",
+      city: "London Hackney",
+      message: "Full setup address found from postcode."
+    }
+  };
 
   function clearDemoBusinessData() {
     const demoClientIds = new Set(["client-1", "client-2"]);
@@ -28,7 +38,6 @@
       );
     }
 
-    if (typeof selectedQuoteItems !== "undefined") selectedQuoteItems = [];
     if (typeof saveState === "function") saveState();
   }
 
@@ -59,71 +68,230 @@
     return typeof className === "function" ? className(value) : typeof cls === "function" ? cls(value) : String(value || "").replaceAll(" ", "-");
   }
 
-  function showQuoteMessage(message) {
-    const status = document.querySelector("#addressStatus");
-    if (status) {
-      status.textContent = message;
-      status.className = "address-status is-warn";
-    }
+  function field(selector) {
+    return document.querySelector(selector);
+  }
+
+  function setupAddressFieldsFixed() {
+    return {
+      line1: field("#addressLine1"),
+      line2: field("#addressLine2"),
+      city: field("#addressCity"),
+      postcode: field("#addressPostcode"),
+      hidden: field("#premises"),
+      preview: field("#addressPreview"),
+      status: field("#addressStatus"),
+      emptyText: "No setup address entered yet."
+    };
+  }
+
+  function clientAddressFieldsFixed() {
+    return {
+      line1: field("#clientAddressLine1"),
+      line2: field("#clientAddressLine2"),
+      city: field("#clientAddressCity"),
+      postcode: field("#clientAddressPostcode"),
+      preview: field("#clientAddressPreview"),
+      status: field("#clientAddressStatus"),
+      emptyText: "No company address entered yet."
+    };
+  }
+
+  function normalisePostcode(value) {
+    const compact = String(value || "").toUpperCase().replace(/\s+/g, "").trim();
+    if (compact.length <= 3) return compact;
+    return `${compact.slice(0, -3)} ${compact.slice(-3)}`;
+  }
+
+  function titleWords(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+  }
+
+  function addressParts(fields) {
+    return [fields.line1?.value, fields.line2?.value, fields.city?.value, fields.postcode?.value]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+  }
+
+  function setAddressMessage(fields, message, type = "") {
+    if (!fields.status) return;
+    fields.status.textContent = message;
+    fields.status.className = `address-status ${type}`.trim();
+  }
+
+  function syncAddress(fields) {
+    if (fields.postcode) fields.postcode.value = normalisePostcode(fields.postcode.value);
+    const text = addressParts(fields).join(", ");
+    if (fields.hidden) fields.hidden.value = text;
+    if (fields.preview) fields.preview.textContent = text || fields.emptyText;
+    return text;
+  }
+
+  function showQuoteMessage(message, type = "is-warn") {
+    setAddressMessage(setupAddressFieldsFixed(), message, type);
     alert(message);
   }
 
   function selectedClientIsReal() {
-    const select = document.querySelector("#quoteClient");
+    const select = field("#quoteClient");
     return isUuid(select?.value || "");
   }
 
-  function blockDemoClientQuote(event) {
-    if (!event.target?.matches?.("#quoteForm")) return;
-    if (selectedClientIsReal()) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
-    showQuoteMessage("Create/select a real Supabase client before saving a quote. Demo clients like client-1 are blocked.");
+  function validateSetupAddress(options = {}) {
+    const fields = setupAddressFieldsFixed();
+    const address = syncAddress(fields);
+    const line1 = String(fields.line1?.value || "").trim();
+    const city = String(fields.city?.value || "").trim();
+    const postcode = String(fields.postcode?.value || "").trim();
+
+    if (!line1) {
+      setAddressMessage(fields, "Add the setup building number and street before saving the quote.", "is-warn");
+      if (options.focus !== false) fields.line1?.focus();
+      return false;
+    }
+    if (!city) {
+      setAddressMessage(fields, "Add the setup town/city before saving the quote.", "is-warn");
+      if (options.focus !== false) fields.city?.focus();
+      return false;
+    }
+    if (!postcodeRegex.test(postcode)) {
+      setAddressMessage(fields, "Add a valid UK setup postcode before saving, for example N16 6JA.", "is-warn");
+      if (options.focus !== false) fields.postcode?.focus();
+      return false;
+    }
+
+    setAddressMessage(fields, `Setup address ready to save: ${address}`, "is-ok");
+    return true;
   }
 
-  document.addEventListener("submit", blockDemoClientQuote, true);
+  async function lookupPostcodeAddressFixed(fields, label) {
+    const postcode = normalisePostcode(fields.postcode?.value);
+    if (fields.postcode) fields.postcode.value = postcode;
+
+    if (!postcodeRegex.test(postcode)) {
+      setAddressMessage(fields, `Enter a valid UK ${label} postcode first, for example N16 6JA.`, "is-warn");
+      fields.postcode?.focus();
+      return;
+    }
+
+    const known = knownPostcodes[postcode];
+    if (known) {
+      if (fields.line1) fields.line1.value = known.line1;
+      if (fields.line2) fields.line2.value = known.line2;
+      if (fields.city) fields.city.value = known.city;
+      syncAddress(fields);
+      setAddressMessage(fields, known.message, "is-ok");
+      return;
+    }
+
+    setAddressMessage(fields, "Checking postcode...", "");
+    try {
+      const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`);
+      const data = await response.json();
+      if (!response.ok || data.status !== 200 || !data.result) throw new Error("Postcode not found");
+
+      const result = data.result;
+      if (fields.city && !fields.city.value.trim()) {
+        fields.city.value = titleWords(result.admin_district || result.parish || result.region || result.country || "");
+      }
+      syncAddress(fields);
+      const message = label === "setup"
+        ? "Postcode found. Add the building number and street, then save the quote."
+        : "Company postcode found. Add the building number and street if needed.";
+      setAddressMessage(fields, message, fields.line1?.value.trim() ? "is-ok" : "is-warn");
+    } catch (error) {
+      setAddressMessage(fields, "Could not find that postcode. Check the postcode or type the address manually.", "is-warn");
+    }
+  }
+
+  function clearAddressFields(fields) {
+    [fields.line1, fields.line2, fields.city, fields.postcode, fields.hidden].forEach((entry) => {
+      if (entry) entry.value = "";
+    });
+    syncAddress(fields);
+    setAddressMessage(fields, "Enter the setup postcode, then use Find from postcode.", "");
+  }
 
   function clearQuoteFormNow() {
-    const form = document.querySelector("#quoteForm");
+    const form = field("#quoteForm");
     if (form) form.reset();
     if (typeof selectedQuoteItems !== "undefined") selectedQuoteItems = [];
 
-    const requiredDate = document.querySelector("#requiredDate");
+    const requiredDate = field("#requiredDate");
     if (requiredDate && typeof todayPlus === "function") requiredDate.value = todayPlus(21);
 
-    ["#addressLine1", "#addressLine2", "#addressCity", "#addressPostcode", "#premises", "#quoteNotes"].forEach((selector) => {
-      const field = document.querySelector(selector);
-      if (field) field.value = "";
-    });
+    const notes = field("#quoteNotes");
+    if (notes) notes.value = "";
 
-    const preview = document.querySelector("#addressPreview");
-    if (preview) preview.textContent = "No setup address entered yet.";
-    const status = document.querySelector("#addressStatus");
-    if (status) {
-      status.textContent = "Enter the setup postcode, then use Find from postcode.";
-      status.className = "address-status";
-    }
+    clearAddressFields(setupAddressFieldsFixed());
 
     if (typeof renderSelectedItems === "function") renderSelectedItems();
     if (typeof renderClientSelect === "function") renderClientSelect();
     if (typeof renderQuotes === "function") renderQuotes();
+
+    setAddressMessage(setupAddressFieldsFixed(), "Quote form cleared. Choose a client and enter the setup address again.", "is-ok");
   }
 
-  function runQuoteAddressButton(id) {
-    if (id === "resetQuoteFormBtn") return clearQuoteFormNow();
-    if (id === "lookupAddressBtn" && typeof lookupPostcodeAddress === "function" && typeof setupAddressFields === "function") return lookupPostcodeAddress(setupAddressFields(), "setup");
-    if (id === "lookupClientAddressBtn" && typeof lookupPostcodeAddress === "function" && typeof clientAddressFields === "function") return lookupPostcodeAddress(clientAddressFields(), "company");
-    if (id === "checkAddressBtn" && typeof checkAddressOnGoogleMaps === "function") return checkAddressOnGoogleMaps();
+  function checkAddressOnMapsFixed() {
+    const fields = setupAddressFieldsFixed();
+    const address = syncAddress(fields);
+    if (!validateSetupAddress({ focus: false })) return;
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, "_blank", "noopener");
   }
+
+  function blockBadQuoteSubmit(event) {
+    if (!event.target?.matches?.("#quoteForm")) return;
+    clearDemoBusinessData();
+
+    if (!selectedClientIsReal()) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      showQuoteMessage("Create/select a real Supabase client before saving a quote. Demo clients like client-1 are blocked.");
+      return;
+    }
+
+    if (!validateSetupAddress()) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      alert(field("#addressStatus")?.textContent || "Please fix the setup address before saving.");
+      return;
+    }
+
+    if (typeof selectedQuoteItems !== "undefined" && (!Array.isArray(selectedQuoteItems) || selectedQuoteItems.length === 0)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      showQuoteMessage("Add at least one item before saving the quote.");
+    }
+  }
+
+  document.addEventListener("input", (event) => {
+    if (event.target?.matches?.("#addressLine1, #addressLine2, #addressCity, #addressPostcode")) {
+      syncAddress(setupAddressFieldsFixed());
+    }
+    if (event.target?.matches?.("#clientAddressLine1, #clientAddressLine2, #clientAddressCity, #clientAddressPostcode")) {
+      syncAddress(clientAddressFieldsFixed());
+    }
+  }, true);
+
+  document.addEventListener("submit", blockBadQuoteSubmit, true);
 
   document.addEventListener("click", (event) => {
     const button = event.target.closest?.("#resetQuoteFormBtn, #lookupAddressBtn, #lookupClientAddressBtn, #checkAddressBtn");
     if (!button) return;
     event.preventDefault();
     event.stopPropagation();
+
     try {
-      const result = runQuoteAddressButton(button.id);
+      let result;
+      if (button.id === "resetQuoteFormBtn") result = clearQuoteFormNow();
+      if (button.id === "lookupAddressBtn") result = lookupPostcodeAddressFixed(setupAddressFieldsFixed(), "setup");
+      if (button.id === "lookupClientAddressBtn") result = lookupPostcodeAddressFixed(clientAddressFieldsFixed(), "company");
+      if (button.id === "checkAddressBtn") result = checkAddressOnMapsFixed();
       if (result?.catch) result.catch((error) => alert(`Button could not finish: ${error.message || "Please try again."}`));
     } catch (error) {
       alert(`Button could not finish: ${error.message || "Please try again."}`);
