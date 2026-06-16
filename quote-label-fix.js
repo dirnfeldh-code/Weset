@@ -8,6 +8,32 @@
 
   const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
 
+  function clearDemoBusinessData() {
+    const demoClientIds = new Set(["client-1", "client-2"]);
+    const demoCompanyNames = new Set(["Northline Finance", "Brightpath Legal"]);
+    const demoQuoteIds = new Set(["Q-1001", "Q-1002"]);
+    const demoExpensePayees = new Set(["Furniture supplier", "Courier partner"]);
+
+    if (typeof state !== "undefined") {
+      state.clients = (state.clients || []).filter((client) =>
+        !demoClientIds.has(String(client.id || "")) &&
+        !demoCompanyNames.has(String(client.company || ""))
+      );
+      state.quotes = (state.quotes || []).filter((quote) =>
+        !demoQuoteIds.has(String(quote.id || "")) &&
+        !demoClientIds.has(String(quote.clientId || ""))
+      );
+      state.expenses = (state.expenses || []).filter((expense) =>
+        !demoExpensePayees.has(String(expense.payee || ""))
+      );
+    }
+
+    if (typeof selectedQuoteItems !== "undefined") selectedQuoteItems = [];
+    if (typeof saveState === "function") saveState();
+  }
+
+  clearDemoBusinessData();
+
   function quoteLabel(quote) {
     const raw = String(quote?.id || "");
     if (/^Q-\d+/i.test(raw)) return raw.toUpperCase();
@@ -44,8 +70,7 @@
 
   function selectedClientIsReal() {
     const select = document.querySelector("#quoteClient");
-    const clientId = select?.value || "";
-    return isUuid(clientId);
+    return isUuid(select?.value || "");
   }
 
   function blockDemoClientQuote(event) {
@@ -54,7 +79,7 @@
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation?.();
-    showQuoteMessage("This quote is using demo browser data instead of a real Supabase client. Go to Clients, create/select a real client, then create the quote again.");
+    showQuoteMessage("Create/select a real Supabase client before saving a quote. Demo clients like client-1 are blocked.");
   }
 
   document.addEventListener("submit", blockDemoClientQuote, true);
@@ -62,14 +87,7 @@
   function clearQuoteFormNow() {
     const form = document.querySelector("#quoteForm");
     if (form) form.reset();
-
-    if (typeof selectedQuoteItems !== "undefined") {
-      const defaults = ["desk", "task-chair", "onsite-setup"];
-      selectedQuoteItems = defaults
-        .map((id) => (state.catalog || []).find((item) => item.id === id || item.code === id.toUpperCase()))
-        .filter(Boolean)
-        .map((item) => ({ ...item, quantity: item.id === "onsite-setup" || item.code === "ONSITE-SETUP" ? 3 : 24 }));
-    }
+    if (typeof selectedQuoteItems !== "undefined") selectedQuoteItems = [];
 
     const requiredDate = document.querySelector("#requiredDate");
     if (requiredDate && typeof todayPlus === "function") requiredDate.value = todayPlus(21);
@@ -88,7 +106,8 @@
     }
 
     if (typeof renderSelectedItems === "function") renderSelectedItems();
-    if (typeof renderCatalogSelect === "function") renderCatalogSelect();
+    if (typeof renderClientSelect === "function") renderClientSelect();
+    if (typeof renderQuotes === "function") renderQuotes();
   }
 
   function runQuoteAddressButton(id) {
@@ -116,33 +135,13 @@
       const client = getClient(quote.clientId);
       const costs = quoteCosts(quote);
       const items = quoteItems(quote);
-      return `<article class="quote-card">
-        <div class="card-top">
-          <div><h3>${safeText(clientName(client))}</h3><p class="meta">Quote ${safeText(quoteLabel(quote))} | ${quote.workstations} workstations, ${quote.rooms} rooms<br>${safeText(quote.premises)}</p></div>
-          <span class="badge ${badgeClass(quote.status)}">${safeText(quote.status)}</span>
-        </div>
-        <p class="meta">${items.slice(0, 4).map((item) => `${item.quantity}x ${safeText(item.name)}`).join(", ")}</p>
-        <p class="meta">Required ${dateText(quote.requiredDate)} | Total ${moneyText(costs.total)}</p>
-        <div class="card-actions">
-          <button class="secondary" data-send-quote="${safeText(quote.id)}" type="button">Prepare email</button>
-          <button class="ghost" data-status="${safeText(quote.id)}:Sent" type="button">Mark sent</button>
-          <button class="ghost" data-status="${safeText(quote.id)}:Accepted" type="button">Accept</button>
-          <button class="ghost" data-status="${safeText(quote.id)}:Declined" type="button">Decline</button>
-        </div>
-      </article>`;
-    };
-  }
-
-  if (typeof renderInstallCard === "function") {
-    renderInstallCard = function friendlyRenderInstallCard(quote) {
-      const client = getClient(quote.clientId);
-      return `<article class="install-card"><div class="card-top"><div><h3>${safeText(clientName(client))}</h3><p class="meta">${safeText(quoteLabel(quote))} | ${quote.installDate ? dateText(quote.installDate) : "Date needed"}</p></div><span class="badge ${badgeClass(quote.installStatus)}">${safeText(quote.installStatus)}</span></div><p class="meta">${safeText(quote.premises)}</p><div class="card-actions"><button class="secondary" data-install="${safeText(quote.id)}:Scheduled" type="button">Schedule</button><button class="ghost" data-install="${safeText(quote.id)}:In progress" type="button">Start</button><button class="ghost" data-install="${safeText(quote.id)}:Complete" type="button">Complete</button></div></article>`;
+      return `<article class="quote-card"><div class="card-top"><div><h3>${safeText(clientName(client))}</h3><p class="meta">Quote ${safeText(quoteLabel(quote))} | ${quote.workstations} workstations, ${quote.rooms} rooms<br>${safeText(quote.premises)}</p></div><span class="badge ${badgeClass(quote.status)}">${safeText(quote.status)}</span></div><p class="meta">${items.slice(0, 4).map((item) => `${item.quantity}x ${safeText(item.name)}`).join(", ")}</p><p class="meta">Required ${dateText(quote.requiredDate)} | Total ${moneyText(costs.total)}</p><div class="card-actions"><button class="secondary" data-send-quote="${safeText(quote.id)}" type="button">Prepare email</button><button class="ghost" data-status="${safeText(quote.id)}:Sent" type="button">Mark sent</button><button class="ghost" data-status="${safeText(quote.id)}:Accepted" type="button">Accept</button><button class="ghost" data-status="${safeText(quote.id)}:Declined" type="button">Decline</button></div></article>`;
     };
   }
 
   if (typeof renderSalesTable === "function") {
     renderSalesTable = function friendlyRenderSalesTable() {
-      els.salesTable.innerHTML = state.quotes.map((quote) => {
+      els.salesTable.innerHTML = (state.quotes || []).map((quote) => {
         const client = getClient(quote.clientId);
         const costs = quoteCosts(quote);
         return `<tr><td>${safeText(quoteLabel(quote))}</td><td>${safeText(clientName(client))}</td><td><span class="badge ${badgeClass(quote.status)}">${safeText(quote.status)}</span></td><td>${moneyText(costs.supply)}</td><td>${moneyText(costs.services)}</td><td><strong>${moneyText(costs.total)}</strong></td></tr>`;
