@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WeSet | Sign in</title>
+  </head>
+  <body>
+    <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet sign in...</p>
+    <script>
+      const version = "20260616-start1";
+      const hash = location.hash || "#dashboard";
+      fetch("live.html?source=" + version)
+        .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
+        .then((html) => {
+          html = html
+            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
+            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
+            .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
+            .replace("</body>", `<script src="users-fix.js?v=${version}"><\/script><script src="password-reset.js?v=${version}"><\/script><script src="login-fix.js?v=${version}"><\/script></body>`);
+          document.open();
+          document.write(html);
+          document.close();
+          if (location.hash !== hash) location.hash = hash;
+        })
+        .catch(() => {
+          document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 18px;'>Could not load WeSet. Please refresh.</p>";
+        });
+    </script>
+  </body>
+</html>
