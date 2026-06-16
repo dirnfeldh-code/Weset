@@ -8,7 +8,7 @@
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet sign in...</p>
     <script>
-      const version = "20260616-connect4";
+      const version = "20260616-connect5";
       const hash = location.hash || "#dashboard";
       fetch("live.html?source=" + version)
         .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
