@@ -1,4 +1,6 @@
 (() => {
+  const edgeFunctionUrl = "https://xonmwexosjogdgmahrvr.supabase.co/functions/v1/send-quote-email";
+
   const style = document.createElement("style");
   style.textContent = `
     dialog {
@@ -44,9 +46,14 @@
       min-height: 140px !important;
       max-height: 26dvh !important;
     }
-    .direct-email-link {
+    .direct-email-link,
+    .send-in-app-button {
       background: #145c58 !important;
       color: #fff !important;
+    }
+    .send-in-app-button[disabled] {
+      cursor: wait !important;
+      opacity: 0.72 !important;
     }
     @media (max-width: 700px) {
       dialog {
@@ -94,9 +101,6 @@
   `;
   document.head.appendChild(style);
 
-  const escapeText = (value) => String(value ?? "");
-  const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(String(value || ""));
-
   function quoteRef(quote) {
     const raw = String(quote?.id || "");
     if (/^Q-\d+/i.test(raw)) return raw.toUpperCase();
@@ -125,34 +129,84 @@
     const reference = quoteRef(quote);
     const subject = `WeSet quote ${reference}`;
     const body = `Hello ${client.contact || ""},\n\nThank you for asking WeSet to quote for your office setup.\n\nQuote reference: ${reference}\nSetup address: ${quote.premises || ""}\nRequired date: ${dateText(quote.requiredDate)}\n\nItems:\n${lines || "Items listed in the quote."}\n\nTotal estimate: ${moneyText(costs.total)}\n\nKind regards,\nWeSet`;
-    return { to: client.email || "", subject, body };
+    return { to: client.email || "", subject, body, reference };
   }
 
-  function mailtoHref(quote) {
+  function sessionToken() {
+    try {
+      return JSON.parse(localStorage.getItem(sessionKey) || "{}").accessToken || "";
+    } catch {
+      return "";
+    }
+  }
+
+  async function sendQuoteInApp(id, button = null) {
+    const quote = (state.quotes || []).find((entry) => entry.id === id);
+    if (!quote) return;
     const email = quoteEmail(quote);
-    return `mailto:${encodeURIComponent(email.to)}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`;
+    if (!email.to) {
+      alert("This client does not have an email address saved. Add the client email first, then send the quote.");
+      return;
+    }
+    const token = sessionToken();
+    if (!token) {
+      alert("Please log in first. Sending email from the app needs your Supabase login session.");
+      return;
+    }
+
+    const oldText = button?.textContent || "Send from app";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Sending...";
+    }
+
+    try {
+      const response = await fetch(edgeFunctionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          quoteId: quote.id,
+          to: email.to,
+          subject: email.subject,
+          text: email.body,
+          reference: email.reference
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || data.message || "Email sender is not configured yet.");
+      alert(`Quote email sent to ${email.to}.`);
+      if (typeof updateQuote === "function") updateQuote(quote.id, { status: "Sent" });
+    } catch (error) {
+      alert(`Could not send straight from the app yet: ${error.message || "Email service is not configured."}\n\nTo make this work, set up the Supabase Edge Function called send-quote-email with an email provider like Resend or SendGrid.`);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = oldText;
+      }
+    }
   }
 
   function addDirectEmailButtons() {
     document.querySelectorAll("[data-send-quote]").forEach((button) => {
       const id = button.dataset.sendQuote;
-      if (!id || button.parentElement?.querySelector(`[data-direct-email="${CSS.escape(id)}"]`)) return;
-      const quote = (state.quotes || []).find((entry) => entry.id === id);
-      if (!quote) return;
-      const link = document.createElement("a");
-      link.className = "primary as-link direct-email-link";
-      link.dataset.directEmail = id;
-      link.href = mailtoHref(quote);
-      link.textContent = "Email now";
-      button.insertAdjacentElement("beforebegin", link);
+      if (!id || button.parentElement?.querySelector(`[data-send-in-app="${CSS.escape(id)}"]`)) return;
+      const sendButton = document.createElement("button");
+      sendButton.className = "primary send-in-app-button";
+      sendButton.dataset.sendInApp = id;
+      sendButton.type = "button";
+      sendButton.textContent = "Send from app";
+      button.insertAdjacentElement("beforebegin", sendButton);
     });
   }
 
   function enhanceEmailDialog() {
     const link = document.querySelector("#emailQuoteLink");
     if (!link) return;
-    link.textContent = "Send email now";
-    link.classList.add("direct-email-link");
+    link.textContent = "Open email app";
+    link.classList.remove("direct-email-link");
   }
 
   const oldRenderQuotes = typeof renderQuotes === "function" ? renderQuotes : null;
@@ -174,17 +228,11 @@
   }
 
   document.addEventListener("click", (event) => {
-    const link = event.target.closest?.("[data-direct-email]");
-    if (!link) return;
-    const quote = (state.quotes || []).find((entry) => entry.id === link.dataset.directEmail);
-    if (!quote) return;
-    const client = typeof getClient === "function" ? getClient(quote.clientId) : {};
-    if (!client.email) {
-      event.preventDefault();
-      alert("This client does not have an email address saved. Add the client email first, then send the quote.");
-      return;
-    }
-    link.href = mailtoHref(quote);
+    const sendButton = event.target.closest?.("[data-send-in-app]");
+    if (!sendButton) return;
+    event.preventDefault();
+    event.stopPropagation();
+    sendQuoteInApp(sendButton.dataset.sendInApp, sendButton);
   }, true);
 
   const oldShowQuoteEmail = typeof showQuoteEmail === "function" ? showQuoteEmail : null;
