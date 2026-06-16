@@ -6,6 +6,8 @@
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 
+  const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+
   function quoteLabel(quote) {
     const raw = String(quote?.id || "");
     if (/^Q-\d+/i.test(raw)) return raw.toUpperCase();
@@ -30,6 +32,32 @@
   function badgeClass(value) {
     return typeof className === "function" ? className(value) : typeof cls === "function" ? cls(value) : String(value || "").replaceAll(" ", "-");
   }
+
+  function showQuoteMessage(message) {
+    const status = document.querySelector("#addressStatus");
+    if (status) {
+      status.textContent = message;
+      status.className = "address-status is-warn";
+    }
+    alert(message);
+  }
+
+  function selectedClientIsReal() {
+    const select = document.querySelector("#quoteClient");
+    const clientId = select?.value || "";
+    return isUuid(clientId);
+  }
+
+  function blockDemoClientQuote(event) {
+    if (!event.target?.matches?.("#quoteForm")) return;
+    if (selectedClientIsReal()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    showQuoteMessage("This quote is using demo browser data instead of a real Supabase client. Go to Clients, create/select a real client, then create the quote again.");
+  }
+
+  document.addEventListener("submit", blockDemoClientQuote, true);
 
   function clearQuoteFormNow() {
     const form = document.querySelector("#quoteForm");
