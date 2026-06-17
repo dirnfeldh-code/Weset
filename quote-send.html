@@ -8,7 +8,7 @@
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet quote form...</p>
     <script>
-      const version = "20260617-quotemodal1";
+      const version = "20260617-quotecolumns1";
       const hash = location.hash || "#quotes";
       fetch("live.html?source=" + version)
         .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
@@ -17,7 +17,7 @@
             .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
             .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
             .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
-            .replace("</body>", `<script src="users-fix.js?v=${version}"><\/script><script src="password-reset.js?v=${version}"><\/script><script src="login-fix.js?v=${version}"><\/script><script src="compat-fix.js?v=${version}"><\/script><script src="display-fix.js?v=${version}"><\/script><script src="quote-label-fix.js?v=${version}"><\/script><script src="client-fix.js?v=${version}"><\/script><script src="clear-fix.js?v=${version}"><\/script><script src="quote-edit-fix.js?v=${version}"><\/script><script src="ui-email-fix.js?v=${version}"><\/script><script src="quote-modal-fix.js?v=${version}"><\/script></body>`);
+            .replace("</body>", `<script src="users-fix.js?v=${version}"><\/script><script src="password-reset.js?v=${version}"><\/script><script src="login-fix.js?v=${version}"><\/script><script src="compat-fix.js?v=${version}"><\/script><script src="display-fix.js?v=${version}"><\/script><script src="quote-label-fix.js?v=${version}"><\/script><script src="client-fix.js?v=${version}"><\/script><script src="clear-fix.js?v=${version}"><\/script><script src="quote-edit-fix.js?v=${version}"><\/script><script src="ui-email-fix.js?v=${version}"><\/script><script src="quote-modal-fix.js?v=${version}"><\/script><script src="quote-columns-fix.js?v=${version}"><\/script></body>`);
           document.open();
           document.write(html);
           document.close();
