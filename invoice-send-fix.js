@@ -98,6 +98,20 @@
     .quote-card .ghost.danger {
       color: #a2413a !important;
     }
+    button.status-live-current,
+    button.is-current,
+    .status-move-button.is-current {
+      background: #145c58 !important;
+      border-color: #145c58 !important;
+      color: #fff !important;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+    }
+    button.status-live-current::after {
+      content: " current";
+      font-size: 11px;
+      font-weight: 700;
+      opacity: 0.8;
+    }
     @media (min-width: 760px) {
       .quote-action-panel {
         grid-template-columns: 1.2fr 1fr;
@@ -368,15 +382,44 @@
     });
   }
 
+  function statusFromDataset(button) {
+    const raw = button.dataset.status || button.dataset.install || "";
+    const parts = raw.split(":");
+    if (parts.length < 2) return null;
+    return { id: parts[0], status: parts.slice(1).join(":") };
+  }
+
+  function highlightStatusButtons() {
+    document.querySelectorAll("[data-status], [data-install]").forEach((button) => {
+      const info = statusFromDataset(button);
+      if (!info) return;
+      const quote = getQuote(info.id);
+      const currentStatus = button.dataset.install ? quote?.installStatus : quote?.status;
+      const isCurrent = currentStatus === info.status;
+      button.classList.toggle("status-live-current", Boolean(isCurrent));
+      button.setAttribute("aria-pressed", isCurrent ? "true" : "false");
+    });
+  }
+
+  function refreshQuoteUi() {
+    addInvoiceButtons();
+    organizeQuoteActions();
+    highlightStatusButtons();
+  }
+
   const oldRenderQuotes = typeof renderQuotes === "function" ? renderQuotes : null;
-  if (oldRenderQuotes) renderQuotes = function renderQuotesWithInvoices() { oldRenderQuotes(); addInvoiceButtons(); organizeQuoteActions(); };
+  if (oldRenderQuotes) renderQuotes = function renderQuotesWithInvoices() { oldRenderQuotes(); refreshQuoteUi(); };
   const oldRenderDashboard = typeof renderDashboard === "function" ? renderDashboard : null;
-  if (oldRenderDashboard) renderDashboard = function renderDashboardWithInvoices() { oldRenderDashboard(); addInvoiceButtons(); organizeQuoteActions(); };
+  if (oldRenderDashboard) renderDashboard = function renderDashboardWithInvoices() { oldRenderDashboard(); refreshQuoteUi(); };
+  const oldRenderInstallations = typeof renderInstallations === "function" ? renderInstallations : null;
+  if (oldRenderInstallations) renderInstallations = function renderInstallationsWithStatusHighlight() { oldRenderInstallations(); highlightStatusButtons(); };
 
   document.addEventListener("click", (event) => {
     const invoicePreview = event.target.closest?.("[data-invoice-quote]");
     const saveButton = event.target.closest?.("[data-save-invoice]");
     const sendButton = event.target.closest?.("[data-send-invoice]");
+    const statusButton = event.target.closest?.("[data-status], [data-install]");
+    if (statusButton) setTimeout(highlightStatusButtons, 120);
     if (invoicePreview) {
       setTimeout(() => enhanceInvoiceDialog(invoicePreview.dataset.invoiceQuote), 0);
       return;
@@ -396,7 +439,7 @@
 
   window.wesetCreateInvoice = createInvoice;
   window.wesetSendInvoice = sendInvoice;
+  window.wesetHighlightStatusButtons = highlightStatusButtons;
 
-  addInvoiceButtons();
-  organizeQuoteActions();
+  refreshQuoteUi();
 })();
