@@ -79,8 +79,12 @@ function pdfEscape(value: string) {
   return value.replace(/[^\x20-\x7E]/g, " ").replace(/[\\()]/g, "\\$&");
 }
 
-function wrapLine(line: string, max = 84) {
-  const words = line.replace(/\s+/g, " ").trim().split(" ");
+function cleanPdfText(value = "") {
+  return value.replace(/[^\x20-\x7E\n]/g, " ").replace(/\s+$/gm, "").trim();
+}
+
+function wrapLine(line: string, max = 74) {
+  const words = line.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   const lines: string[] = [];
   let current = "";
   for (const word of words) {
@@ -95,27 +99,96 @@ function wrapLine(line: string, max = 84) {
   return lines.length ? lines : [""];
 }
 
+function matchLine(text: string, label: string) {
+  const re = new RegExp(`${label}\\s*:?\\s*([^\\n]+)`, "i");
+  return text.match(re)?.[1]?.trim() || "";
+}
+
 function buildPdf(payload: QuoteEmailPayload) {
-  const source = stripHtml(payload.invoiceHtml || payload.html || payload.text || "WeSet invoice").replace(/[^\x20-\x7E\n]/g, " ");
-  const rawLines = [
-    "WeSet Invoice",
-    payload.reference ? `Reference: ${payload.reference}` : "",
-    "",
-    ...source.split("\n")
-  ].filter((line, index) => index < 2 || line.trim() !== "");
+  const source = cleanPdfText(stripHtml(payload.invoiceHtml || payload.html || payload.text || "WeSet invoice"));
+  const summary = cleanPdfText(stripHtml(payload.text || ""));
+  const reference = payload.reference || "Invoice";
+  const today = new Date().toISOString().slice(0, 10);
+  const setupAddress = matchLine(summary, "Setup address") || matchLine(source, "Setup address") || "See invoice details";
+  const quoteRef = matchLine(summary, "Quote") || reference;
+  const subtotal = matchLine(summary, "Subtotal") || matchLine(source, "Subtotal") || "";
+  const vat = matchLine(summary, "VAT") || matchLine(source, "VAT") || "";
+  const total = matchLine(summary, "Total due") || matchLine(summary, "Total") || matchLine(source, "Total due") || "";
+  const detailLines = source
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !/^WeSet|^Invoice$|^Date:|^Quote reference:/i.test(line))
+    .flatMap((line) => wrapLine(line, 82))
+    .slice(0, 21);
 
-  const lines = rawLines.flatMap((line) => wrapLine(line)).slice(0, 42);
-  const textOps = ["BT", "/F1 18 Tf", "50 790 Td", "(WeSet Invoice) Tj", "/F1 10 Tf", "0 -26 Td"];
-  for (const line of lines.slice(1)) textOps.push(`(${pdfEscape(line)}) Tj`, "0 -15 Td");
-  textOps.push("ET");
-  const stream = textOps.join("\n");
+  const ops: string[] = [];
+  const rect = (x: number, y: number, w: number, h: number, color: string) => ops.push("q", `${color} rg`, `${x} ${y} ${w} ${h} re f`, "Q");
+  const strokeRect = (x: number, y: number, w: number, h: number, color: string) => ops.push("q", `${color} RG`, `${x} ${y} ${w} ${h} re S`, "Q");
+  const text = (x: number, y: number, value: string, size = 10, font = "F1", color = "0.114 0.145 0.157") => {
+    ops.push("BT", `${color} rg`, `/${font} ${size} Tf`, `${x} ${y} Td`, `(${pdfEscape(value)}) Tj`, "ET");
+  };
+  const rightText = (x: number, y: number, value: string, size = 10, font = "F1", color = "0.114 0.145 0.157") => {
+    const approx = value.length * size * 0.52;
+    text(Math.max(40, x - approx), y, value, size, font, color);
+  };
 
+  rect(0, 742, 595, 100, "0.078 0.361 0.345");
+  rect(38, 766, 118, 42, "1 1 1");
+  text(55, 783, "WeSet", 22, "F2", "0.078 0.361 0.345");
+  text(390, 790, "INVOICE", 27, "F2", "1 1 1");
+  text(390, 770, `Reference: ${reference}`, 11, "F1", "0.862 0.910 0.918");
+
+  text(40, 708, "Bill to", 12, "F2");
+  rect(40, 620, 250, 76, "0.973 0.980 0.984");
+  strokeRect(40, 620, 250, 76, "0.851 0.878 0.882");
+  wrapLine(setupAddress, 42).slice(0, 4).forEach((line, index) => text(56, 672 - index * 15, line, 10));
+
+  text(330, 708, "Invoice details", 12, "F2");
+  rect(330, 620, 225, 76, "0.910 0.953 0.945");
+  strokeRect(330, 620, 225, 76, "0.851 0.878 0.882");
+  text(346, 672, `Invoice: ${reference}`, 10, "F2");
+  text(346, 656, `Quote: ${quoteRef}`, 10);
+  text(346, 640, `Date: ${today}`, 10);
+
+  rect(40, 560, 515, 30, "0.078 0.361 0.345");
+  text(56, 570, "Description", 10, "F2", "1 1 1");
+  rightText(535, 570, "Amount", 10, "F2", "1 1 1");
+  rect(40, 410, 515, 150, "1 1 1");
+  strokeRect(40, 410, 515, 150, "0.851 0.878 0.882");
+
+  let y = 538;
+  const rows = detailLines.length ? detailLines : ["Office setup invoice", "Please see the email body for the full invoice details."];
+  for (const line of rows.slice(0, 9)) {
+    text(56, y, line.slice(0, 92), 9);
+    y -= 14;
+  }
+
+  rect(330, 286, 225, 96, "0.973 0.980 0.984");
+  strokeRect(330, 286, 225, 96, "0.851 0.878 0.882");
+  text(346, 358, "Summary", 12, "F2");
+  if (subtotal) { text(346, 336, "Subtotal", 10); rightText(535, 336, subtotal, 10, "F2"); }
+  if (vat) { text(346, 318, "VAT", 10); rightText(535, 318, vat, 10, "F2"); }
+  rect(330, 286, 225, 24, "0.078 0.361 0.345");
+  text(346, 294, "Total due", 11, "F2", "1 1 1");
+  rightText(535, 294, total || "See invoice", 11, "F2", "1 1 1");
+
+  rect(40, 286, 250, 96, "0.910 0.953 0.945");
+  strokeRect(40, 286, 250, 96, "0.851 0.878 0.882");
+  text(56, 358, "Payment notes", 12, "F2");
+  text(56, 336, "Thank you for choosing WeSet.", 10);
+  text(56, 320, "Please contact us with any invoice questions.", 10);
+
+  text(40, 70, "WeSet | Office setup, quoted clearly", 9, "F2", "0.078 0.361 0.345");
+  text(40, 55, "This invoice was generated automatically from the WeSet app.", 8, "F1", "0.408 0.455 0.471");
+
+  const stream = ops.join("\n");
   const objects = [
     "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
     "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >> /Contents 5 0 R >>\nendobj\n",
     "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
-    `5 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`
+    `5 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`,
+    "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n"
   ];
 
   let pdf = "%PDF-1.4\n";
