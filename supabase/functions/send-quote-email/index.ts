@@ -45,7 +45,8 @@ function stripHtml(value = "") {
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
-    .replace(/&pound;/g, "£")
+    .replace(/&pound;/g, "GBP ")
+    .replace(/£/g, "GBP ")
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
     .replace(/\n{3,}/g, "\n\n")
@@ -75,7 +76,7 @@ function designedEmail(payload: QuoteEmailPayload) {
 }
 
 function pdfEscape(value: string) {
-  return value.replace(/[\\()]/g, "\\$&");
+  return value.replace(/[^\x20-\x7E]/g, " ").replace(/[\\()]/g, "\\$&");
 }
 
 function wrapLine(line: string, max = 84) {
@@ -95,7 +96,7 @@ function wrapLine(line: string, max = 84) {
 }
 
 function buildPdf(payload: QuoteEmailPayload) {
-  const source = stripHtml(payload.invoiceHtml || payload.html || payload.text || "WeSet invoice");
+  const source = stripHtml(payload.invoiceHtml || payload.html || payload.text || "WeSet invoice").replace(/[^\x20-\x7E\n]/g, " ");
   const rawLines = [
     "WeSet Invoice",
     payload.reference ? `Reference: ${payload.reference}` : "",
@@ -104,7 +105,7 @@ function buildPdf(payload: QuoteEmailPayload) {
   ].filter((line, index) => index < 2 || line.trim() !== "");
 
   const lines = rawLines.flatMap((line) => wrapLine(line)).slice(0, 42);
-  const textOps = ["BT", "/F1 18 Tf", "50 790 Td", `(WeSet Invoice) Tj`, "/F1 10 Tf", "0 -26 Td"];
+  const textOps = ["BT", "/F1 18 Tf", "50 790 Td", "(WeSet Invoice) Tj", "/F1 10 Tf", "0 -26 Td"];
   for (const line of lines.slice(1)) textOps.push(`(${pdfEscape(line)}) Tj`, "0 -15 Td");
   textOps.push("ET");
   const stream = textOps.join("\n");
@@ -127,7 +128,7 @@ function buildPdf(payload: QuoteEmailPayload) {
   pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
   for (let i = 1; i < offsets.length; i++) pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return btoa(String.fromCharCode(...new TextEncoder().encode(pdf)));
+  return btoa(pdf);
 }
 
 Deno.serve(async (request) => {
