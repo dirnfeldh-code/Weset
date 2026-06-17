@@ -34,6 +34,84 @@
       border-color: #fed7aa;
       color: #7c2d12;
     }
+    .quote-card .quote-record-actions {
+      background: #f8fafb !important;
+      border: 1px solid var(--line, #d9e0e1) !important;
+      border-radius: 8px !important;
+      display: grid !important;
+      gap: 10px !important;
+      padding: 10px !important;
+    }
+    .quote-action-panel {
+      display: grid;
+      gap: 10px;
+      width: 100%;
+    }
+    .quote-action-group {
+      align-items: stretch;
+      display: grid;
+      gap: 8px;
+    }
+    .quote-action-label {
+      color: var(--muted, #687478);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .quote-action-row {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .quote-action-row > button,
+    .quote-action-row > a.as-link {
+      min-height: 38px;
+      width: 100%;
+    }
+    .quote-action-group.is-primary .quote-action-row {
+      grid-template-columns: 1fr;
+    }
+    .quote-action-group.is-tools .quote-action-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .quote-card .quote-status-actions {
+      background: #fff !important;
+      border: 1px solid var(--line, #d9e0e1) !important;
+      border-radius: 8px !important;
+      display: grid !important;
+      gap: 8px !important;
+      grid-template-columns: 1fr !important;
+      margin-top: 10px !important;
+      padding: 10px !important;
+    }
+    .quote-card .quote-status-actions::before {
+      color: var(--muted, #687478);
+      content: "Move status";
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .quote-card .quote-status-actions button {
+      width: 100%;
+    }
+    .quote-card .ghost.danger {
+      color: #a2413a !important;
+    }
+    @media (min-width: 760px) {
+      .quote-action-panel {
+        grid-template-columns: 1.2fr 1fr;
+      }
+      .quote-action-group.is-tools {
+        grid-column: 1 / -1;
+      }
+    }
+    @media (max-width: 620px) {
+      .quote-action-row,
+      .quote-action-group.is-tools .quote-action-row {
+        grid-template-columns: 1fr;
+      }
+    }
   `;
   document.head.appendChild(style);
 
@@ -258,10 +336,42 @@
     });
   }
 
+  function makeActionGroup(label, className, buttons) {
+    const group = document.createElement("div");
+    group.className = `quote-action-group ${className}`.trim();
+    const labelNode = document.createElement("div");
+    labelNode.className = "quote-action-label";
+    labelNode.textContent = label;
+    const row = document.createElement("div");
+    row.className = "quote-action-row";
+    buttons.filter(Boolean).forEach((button) => row.appendChild(button));
+    group.append(labelNode, row);
+    return group;
+  }
+
+  function organizeQuoteActions() {
+    document.querySelectorAll(".quote-record-actions").forEach((actions) => {
+      const sendQuote = actions.querySelector("[data-send-in-app]");
+      const prepareEmail = actions.querySelector("[data-send-quote]");
+      const createInvoiceButton = actions.querySelector("[data-invoice-quote]");
+      const sendInvoiceButton = actions.querySelector("[data-send-invoice]");
+      const editButton = actions.querySelector("[data-edit-quote]");
+      const deleteButton = actions.querySelector("[data-delete-quote]");
+      if (!sendQuote && !prepareEmail && !createInvoiceButton && !sendInvoiceButton && !editButton && !deleteButton) return;
+
+      const panel = document.createElement("div");
+      panel.className = "quote-action-panel";
+      if (sendQuote || prepareEmail) panel.appendChild(makeActionGroup("Quote email", "is-primary", [sendQuote, prepareEmail]));
+      if (createInvoiceButton || sendInvoiceButton) panel.appendChild(makeActionGroup("Invoice", "is-primary", [createInvoiceButton, sendInvoiceButton]));
+      if (editButton || deleteButton) panel.appendChild(makeActionGroup("Manage", "is-tools", [editButton, deleteButton]));
+      actions.replaceChildren(panel);
+    });
+  }
+
   const oldRenderQuotes = typeof renderQuotes === "function" ? renderQuotes : null;
-  if (oldRenderQuotes) renderQuotes = function renderQuotesWithInvoices() { oldRenderQuotes(); addInvoiceButtons(); };
+  if (oldRenderQuotes) renderQuotes = function renderQuotesWithInvoices() { oldRenderQuotes(); addInvoiceButtons(); organizeQuoteActions(); };
   const oldRenderDashboard = typeof renderDashboard === "function" ? renderDashboard : null;
-  if (oldRenderDashboard) renderDashboard = function renderDashboardWithInvoices() { oldRenderDashboard(); addInvoiceButtons(); };
+  if (oldRenderDashboard) renderDashboard = function renderDashboardWithInvoices() { oldRenderDashboard(); addInvoiceButtons(); organizeQuoteActions(); };
 
   document.addEventListener("click", (event) => {
     const invoicePreview = event.target.closest?.("[data-invoice-quote]");
@@ -288,4 +398,5 @@
   window.wesetSendInvoice = sendInvoice;
 
   addInvoiceButtons();
+  organizeQuoteActions();
 })();
