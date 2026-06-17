@@ -68,7 +68,8 @@
     return { ...payload, to: payload.to || client.email || "" };
   }
 
-  function sessionToken() {
+  function functionToken() {
+    if (typeof sbAnonKey !== "undefined" && sbAnonKey) return sbAnonKey;
     try { return JSON.parse(localStorage.getItem(sessionKey) || "{}").accessToken || ""; } catch { return ""; }
   }
 
@@ -77,8 +78,8 @@
     if (!quote) return;
     const email = quoteEmail(quote);
     if (!email.to) return alert("This client does not have an email address saved. Add the client email first, then send the quote.");
-    const token = sessionToken();
-    if (!token) return alert("Please log in first. Sending email from the app needs your Supabase login session.");
+    const token = functionToken();
+    if (!token) return alert("The email sender is missing the Supabase anon token. Refresh the app and try again.");
 
     const oldText = button?.textContent || "Send from app";
     if (button) { button.disabled = true; button.textContent = "Sending..."; }
