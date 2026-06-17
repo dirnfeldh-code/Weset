@@ -9,17 +9,20 @@ type QuoteEmailPayload = {
   to?: string;
   subject?: string;
   text?: string;
+  html?: string;
+  invoiceHtml?: string;
   reference?: string;
 };
 
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json"
-    }
+    headers: { ...corsHeaders, "Content-Type": "application/json" }
   });
+}
+
+function attachmentName(reference?: string) {
+  return `${(reference || "weset-quote").toLowerCase().replace(/[^a-z0-9-]+/g, "-")}.html`;
 }
 
 Deno.serve(async (request) => {
@@ -33,20 +36,27 @@ Deno.serve(async (request) => {
   const payload = await request.json().catch(() => ({})) as QuoteEmailPayload;
   if (!payload.to) return json({ error: "Client email address is missing." }, 400);
   if (!payload.subject) return json({ error: "Email subject is missing." }, 400);
-  if (!payload.text) return json({ error: "Email body is missing." }, 400);
+  if (!payload.text && !payload.html) return json({ error: "Email body is missing." }, 400);
+
+  const body: Record<string, unknown> = {
+    from: fromEmail,
+    to: [payload.to],
+    subject: payload.subject,
+    text: payload.text || "Please see the attached WeSet quote.",
+    html: payload.html || undefined
+  };
+
+  if (payload.invoiceHtml) {
+    body.attachments = [{
+      filename: attachmentName(payload.reference),
+      content: btoa(unescape(encodeURIComponent(payload.invoiceHtml)))
+    }];
+  }
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from: fromEmail,
-      to: [payload.to],
-      subject: payload.subject,
-      text: payload.text
-    })
+    headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
   });
 
   const data = await response.json().catch(() => ({}));
