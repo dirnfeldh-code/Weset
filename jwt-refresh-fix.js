@@ -2,6 +2,11 @@
   const refreshSkewSeconds = 90;
   let refreshPromise = null;
 
+  function showError(title, error, details = "") {
+    if (typeof window.wesetShowConnectionError === "function") window.wesetShowConnectionError(title, error, details);
+    else alert(`${title}: ${error?.message || error || "Unknown error"}`);
+  }
+
   function readSession() {
     try {
       return JSON.parse(localStorage.getItem(sessionKey) || "{}");
@@ -36,7 +41,10 @@
 
   async function refreshSession(force = false) {
     const session = readSession();
-    if (!session.refreshToken || typeof sbUrl === "undefined" || typeof sbAnonKey === "undefined") return false;
+    if (!session.refreshToken || typeof sbUrl === "undefined" || typeof sbAnonKey === "undefined") {
+      if (force) showError("Supabase login problem", "No refresh token is available. Please sign in again.");
+      return false;
+    }
     if (!force && !tokenNeedsRefresh()) return true;
     if (refreshPromise) return refreshPromise;
 
@@ -60,11 +68,7 @@
       })
       .catch((error) => {
         console.warn("Supabase session refresh failed", error);
-        if (String(error.message || "").toLowerCase().includes("refresh")) {
-          localStorage.removeItem(sessionKey);
-          alert("Your Supabase login expired. Please sign in again to continue saving data.");
-          if (typeof updateAuthView === "function") updateAuthView();
-        }
+        showError("Supabase login expired", error, "Please log out, refresh the page, and sign in again.");
         return false;
       })
       .finally(() => {
@@ -86,6 +90,7 @@
         return await oldSbRequest(path, options);
       } catch (error) {
         if (!isJwtExpiredError(error)) throw error;
+        showError("Supabase login expired", error, "The app will try to refresh your login once now.");
         const refreshed = await refreshSession(true);
         if (!refreshed) throw error;
         return oldSbRequest(path, options);
