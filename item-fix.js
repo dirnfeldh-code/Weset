@@ -10,6 +10,10 @@
 
   const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(String(value || ""));
   const connected = () => typeof sbIsConnected === "function" ? sbIsConnected() : Boolean(JSON.parse(localStorage.getItem(sessionKey) || "{}").accessToken);
+  const itemClass = (value) => typeof className === "function" ? className(value) : String(value || "").replaceAll(" ", "-");
+  const itemMoney = (value) => typeof formatMoney === "function"
+    ? formatMoney(value)
+    : new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(value || 0);
 
   function itemFromForm(existingId = "") {
     return {
@@ -62,16 +66,21 @@
   function renderItemRows() {
     const query = els.searchInput.value.trim().toLowerCase();
     const items = (state.catalog || []).filter((item) => !query || Object.values(item).join(" ").toLowerCase().includes(query));
-    els.catalogList.innerHTML = items.map((item) => `<article class="catalog-item">
-      <div>
+    els.catalogList.innerHTML = items.map((item) => `<article class="catalog-item item-catalog-row">
+      <div class="item-catalog-main">
         <h3>${clean(item.name)}</h3>
-        <p class="meta">${clean(item.description)}<br>${clean(item.supplier)} | ${clean(item.code)} | ${clean(item.leadTime)}</p>
-        <div class="card-actions">
-          <button class="secondary" data-edit-item="${clean(item.id)}" type="button">Edit</button>
-          <button class="ghost danger" data-delete-item="${clean(item.id)}" type="button">Delete</button>
-        </div>
+        <p class="meta item-description">${clean(item.description || "No description saved yet.")}</p>
+        <p class="meta item-code-line">${clean(item.supplier || "No supplier")} | ${clean(item.code || "No code")} | ${clean(item.leadTime || "No lead time")}</p>
       </div>
-      <div><span class="badge ${className(item.category)}">${clean(item.category)}</span><strong>${formatMoney(item.unitCost)}</strong><p class="meta">${clean(item.unit)}</p></div>
+      <div class="item-catalog-price">
+        <span class="badge ${itemClass(item.category)}">${clean(item.category)}</span>
+        <strong>${itemMoney(item.unitCost)}</strong>
+        <p class="meta">${clean(item.unit || "each")}</p>
+      </div>
+      <div class="item-catalog-actions">
+        <button class="secondary" data-edit-item="${clean(item.id)}" type="button">Edit</button>
+        <button class="ghost danger" data-delete-item="${clean(item.id)}" type="button">Delete</button>
+      </div>
     </article>`).join("") || empty("No items match your search.");
   }
 
