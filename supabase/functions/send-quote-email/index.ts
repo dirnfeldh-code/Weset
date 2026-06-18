@@ -22,11 +22,11 @@ function json(body: Record<string, unknown>, status = 200) {
 }
 
 function safeName(reference?: string) {
-  return (reference || "weset-invoice").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "") || "weset-invoice";
+  return (reference || "weset-document").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "") || "weset-document";
 }
 
-function escapeHtml(value: string) {
-  return value
+function escapeHtml(value = "") {
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -35,7 +35,7 @@ function escapeHtml(value: string) {
 }
 
 function stripHtml(value = "") {
-  return value
+  return String(value)
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<br\s*\/?>/gi, "\n")
@@ -49,26 +49,29 @@ function stripHtml(value = "") {
     .replace(/£/g, "GBP ")
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
+    .replace(/\s+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
+function removeRemoteImages(html = "") {
+  return String(html).replace(/<img\b[^>]*>/gi, `<div style="display:inline-block;background:#ffffff;color:#145c58;border-radius:6px;padding:8px 12px;font-size:24px;font-weight:800;line-height:1;">WeSet</div>`);
+}
+
 function designedEmail(payload: QuoteEmailPayload) {
-  if (payload.html) return payload.html;
-  const text = escapeHtml(payload.text || "Please see the attached WeSet invoice.").replaceAll("\n", "<br>");
-  const title = escapeHtml(payload.reference || "WeSet invoice");
+  if (payload.html) return removeRemoteImages(payload.html);
+  const title = escapeHtml(payload.reference || "WeSet document");
+  const text = escapeHtml(payload.text || "Please see the attached WeSet PDF.").replaceAll("\n", "<br>");
   return `<div style="margin:0;background:#eef5f4;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#1d2528;">
     <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #d9e0e1;border-radius:8px;overflow:hidden;">
       <div style="background:#145c58;color:#ffffff;padding:24px 28px;">
-        <img src="https://dirnfeldh-code.github.io/Weset/assets/weset-logo-live.jpg" alt="WeSet" style="display:block;max-width:190px;background:#ffffff;border-radius:6px;padding:4px;margin-bottom:16px;">
-        <h1 style="font-size:26px;line-height:1.2;margin:0;">${title}</h1>
+        <div style="display:inline-block;background:#ffffff;color:#145c58;border-radius:6px;padding:8px 12px;font-size:24px;font-weight:800;line-height:1;">WeSet</div>
+        <h1 style="font-size:26px;line-height:1.2;margin:18px 0 0;">${title}</h1>
         <p style="margin:8px 0 0;color:#dce8ea;">Office setup, quoted clearly.</p>
       </div>
       <div style="padding:24px 28px;font-size:15px;line-height:1.6;">
         <p style="margin-top:0;">${text}</p>
-        <div style="background:#e8f3f1;border-radius:8px;margin-top:22px;padding:14px 16px;">
-          <strong>The invoice PDF is attached to this email.</strong>
-        </div>
+        <div style="background:#e8f3f1;border-radius:8px;margin-top:22px;padding:14px 16px;"><strong>The PDF is attached to this email.</strong></div>
         <p style="margin-bottom:0;">Kind regards,<br><strong>WeSet</strong></p>
       </div>
     </div>
@@ -80,10 +83,10 @@ function pdfEscape(value: string) {
 }
 
 function cleanPdfText(value = "") {
-  return value.replace(/[^\x20-\x7E\n]/g, " ").replace(/\s+$/gm, "").trim();
+  return stripHtml(value).replace(/[^\x20-\x7E\n]/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function wrapLine(line: string, max = 74) {
+function wrapLine(line: string, max = 82) {
   const words = line.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   const lines: string[] = [];
   let current = "";
@@ -105,21 +108,21 @@ function matchLine(text: string, label: string) {
 }
 
 function buildPdf(payload: QuoteEmailPayload) {
-  const source = cleanPdfText(stripHtml(payload.invoiceHtml || payload.html || payload.text || "WeSet invoice"));
-  const summary = cleanPdfText(stripHtml(payload.text || ""));
-  const reference = payload.reference || "Invoice";
+  const source = cleanPdfText(payload.invoiceHtml || payload.html || payload.text || "WeSet document");
+  const summary = cleanPdfText(payload.text || "");
+  const reference = payload.reference || "WeSet document";
   const today = new Date().toISOString().slice(0, 10);
-  const setupAddress = matchLine(summary, "Setup address") || matchLine(source, "Setup address") || "See invoice details";
+  const setupAddress = matchLine(summary, "Setup address") || matchLine(source, "Setup address") || "See document details";
   const quoteRef = matchLine(summary, "Quote") || reference;
   const subtotal = matchLine(summary, "Subtotal") || matchLine(source, "Subtotal") || "";
   const vat = matchLine(summary, "VAT") || matchLine(source, "VAT") || "";
-  const total = matchLine(summary, "Total due") || matchLine(summary, "Total") || matchLine(source, "Total due") || "";
+  const total = matchLine(summary, "Total due") || matchLine(summary, "Total") || matchLine(source, "Total due") || matchLine(source, "Total") || "";
   const detailLines = source
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line && !/^WeSet|^Invoice$|^Date:|^Quote reference:/i.test(line))
-    .flatMap((line) => wrapLine(line, 82))
-    .slice(0, 21);
+    .filter((line) => line && !/^WeSet$|^Quote$|^Invoice$|^Date:|^Reference:/i.test(line))
+    .flatMap((line) => wrapLine(line))
+    .slice(0, 18);
 
   const ops: string[] = [];
   const rect = (x: number, y: number, w: number, h: number, color: string) => ops.push("q", `${color} rg`, `${x} ${y} ${w} ${h} re f`, "Q");
@@ -127,26 +130,23 @@ function buildPdf(payload: QuoteEmailPayload) {
   const text = (x: number, y: number, value: string, size = 10, font = "F1", color = "0.114 0.145 0.157") => {
     ops.push("BT", `${color} rg`, `/${font} ${size} Tf`, `${x} ${y} Td`, `(${pdfEscape(value)}) Tj`, "ET");
   };
-  const rightText = (x: number, y: number, value: string, size = 10, font = "F1", color = "0.114 0.145 0.157") => {
-    const approx = value.length * size * 0.52;
-    text(Math.max(40, x - approx), y, value, size, font, color);
-  };
+  const rightText = (x: number, y: number, value: string, size = 10, font = "F1", color = "0.114 0.145 0.157") => text(Math.max(40, x - value.length * size * 0.52), y, value, size, font, color);
 
   rect(0, 742, 595, 100, "0.078 0.361 0.345");
   rect(38, 766, 118, 42, "1 1 1");
   text(55, 783, "WeSet", 22, "F2", "0.078 0.361 0.345");
-  text(390, 790, "INVOICE", 27, "F2", "1 1 1");
-  text(390, 770, `Reference: ${reference}`, 11, "F1", "0.862 0.910 0.918");
+  text(360, 790, reference.toUpperCase().startsWith("INV") ? "INVOICE" : "QUOTE", 27, "F2", "1 1 1");
+  text(360, 770, `Reference: ${reference}`, 11, "F1", "0.862 0.910 0.918");
 
-  text(40, 708, "Bill to", 12, "F2");
+  text(40, 708, "Client / setup address", 12, "F2");
   rect(40, 620, 250, 76, "0.973 0.980 0.984");
   strokeRect(40, 620, 250, 76, "0.851 0.878 0.882");
   wrapLine(setupAddress, 42).slice(0, 4).forEach((line, index) => text(56, 672 - index * 15, line, 10));
 
-  text(330, 708, "Invoice details", 12, "F2");
+  text(330, 708, "Document details", 12, "F2");
   rect(330, 620, 225, 76, "0.910 0.953 0.945");
   strokeRect(330, 620, 225, 76, "0.851 0.878 0.882");
-  text(346, 672, `Invoice: ${reference}`, 10, "F2");
+  text(346, 672, `Reference: ${reference}`, 10, "F2");
   text(346, 656, `Quote: ${quoteRef}`, 10);
   text(346, 640, `Date: ${today}`, 10);
 
@@ -157,7 +157,7 @@ function buildPdf(payload: QuoteEmailPayload) {
   strokeRect(40, 410, 515, 150, "0.851 0.878 0.882");
 
   let y = 538;
-  const rows = detailLines.length ? detailLines : ["Office setup invoice", "Please see the email body for the full invoice details."];
+  const rows = detailLines.length ? detailLines : ["Office setup document", "Please see the email body for the full details."];
   for (const line of rows.slice(0, 9)) {
     text(56, y, line.slice(0, 92), 9);
     y -= 14;
@@ -169,17 +169,17 @@ function buildPdf(payload: QuoteEmailPayload) {
   if (subtotal) { text(346, 336, "Subtotal", 10); rightText(535, 336, subtotal, 10, "F2"); }
   if (vat) { text(346, 318, "VAT", 10); rightText(535, 318, vat, 10, "F2"); }
   rect(330, 286, 225, 24, "0.078 0.361 0.345");
-  text(346, 294, "Total due", 11, "F2", "1 1 1");
-  rightText(535, 294, total || "See invoice", 11, "F2", "1 1 1");
+  text(346, 294, "Total", 11, "F2", "1 1 1");
+  rightText(535, 294, total || "See document", 11, "F2", "1 1 1");
 
   rect(40, 286, 250, 96, "0.910 0.953 0.945");
   strokeRect(40, 286, 250, 96, "0.851 0.878 0.882");
-  text(56, 358, "Payment notes", 12, "F2");
+  text(56, 358, "Notes", 12, "F2");
   text(56, 336, "Thank you for choosing WeSet.", 10);
-  text(56, 320, "Please contact us with any invoice questions.", 10);
+  text(56, 320, "Please contact us with any questions.", 10);
 
   text(40, 70, "WeSet | Office setup, quoted clearly", 9, "F2", "0.078 0.361 0.345");
-  text(40, 55, "This invoice was generated automatically from the WeSet app.", 8, "F1", "0.408 0.455 0.471");
+  text(40, 55, "Generated from the WeSet app.", 8, "F1", "0.408 0.455 0.471");
 
   const stream = ops.join("\n");
   const objects = [
@@ -217,15 +217,14 @@ Deno.serve(async (request) => {
   if (!payload.subject) return json({ error: "Email subject is missing." }, 400);
   if (!payload.text && !payload.html) return json({ error: "Email body is missing." }, 400);
 
-  const attachments = payload.invoiceHtml || payload.text || payload.html
-    ? [{ filename: `${safeName(payload.reference)}.pdf`, content: buildPdf(payload) }]
-    : [];
+  const filename = `${safeName(payload.reference)}.pdf`;
+  const attachments = [{ filename, content: buildPdf(payload), contentType: "application/pdf" }];
 
   const body: Record<string, unknown> = {
     from: fromEmail,
     to: [payload.to],
     subject: payload.subject,
-    text: payload.text || stripHtml(payload.html) || "Please see the attached WeSet invoice.",
+    text: payload.text || stripHtml(payload.html) || "Please see the attached WeSet PDF.",
     html: designedEmail(payload),
     attachments
   };
@@ -238,5 +237,5 @@ Deno.serve(async (request) => {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) return json({ error: data.message || "Email provider rejected the message.", details: data }, 502);
-  return json({ ok: true, providerId: data.id || null, quoteId: payload.quoteId || null, reference: payload.reference || null, attachment: attachments[0]?.filename || null });
+  return json({ ok: true, providerId: data.id || null, quoteId: payload.quoteId || null, reference: payload.reference || null, attachment: filename });
 });
