@@ -1,6 +1,7 @@
 (() => {
   const storeKey = "weset.expense.vat.records";
   const defaultRate = 20;
+  let editingExpenseId = "";
 
   function readStore() {
     try { return JSON.parse(localStorage.getItem(storeKey) || "{}"); } catch { return {}; }
@@ -22,19 +23,13 @@
 
   function expenseVat(id) {
     const stored = readStore()[id] || {};
-    return {
-      enabled: Boolean(stored.enabled),
-      rate: Number(stored.rate ?? defaultRate)
-    };
+    return { enabled: Boolean(stored.enabled), rate: Number(stored.rate ?? defaultRate) };
   }
 
   function saveExpenseVat(id, settings) {
     if (!id) return;
     const records = readStore();
-    records[id] = {
-      enabled: Boolean(settings.enabled),
-      rate: Number(settings.rate || defaultRate)
-    };
+    records[id] = { enabled: Boolean(settings.enabled), rate: Number(settings.rate || defaultRate) };
     writeStore(records);
   }
 
@@ -51,45 +46,13 @@
     const style = document.createElement("style");
     style.id = "expenseVatRecordStyles";
     style.textContent = `
-      .expense-vat-controls {
-        align-items: end;
-        background: #f8fbfa;
-        border: 1px solid var(--line, #d9e0e1);
-        border-radius: 8px;
-        display: grid;
-        gap: 10px;
-        grid-column: 1 / -1;
-        grid-template-columns: minmax(160px, .7fr) minmax(120px, .45fr) minmax(0, 1fr);
-        padding: 10px;
-      }
-      .expense-vat-controls .check-row {
-        min-height: 40px;
-      }
-      .expense-vat-preview {
-        color: #145c58;
-        font-size: 13px;
-        font-weight: 800;
-        margin: 0;
-      }
-      .expense-vat-button {
-        min-width: 94px !important;
-        white-space: nowrap !important;
-      }
-      .expense-vat-button.is-on {
-        background: #145c58 !important;
-        color: #fff !important;
-      }
-      .expense-vat-note {
-        color: #687478;
-        display: block;
-        font-size: 12px;
-        margin-top: 4px;
-      }
-      @media (max-width: 760px) {
-        .expense-vat-controls {
-          grid-template-columns: 1fr;
-        }
-      }
+      .expense-vat-controls { align-items: end; background: #f8fbfa; border: 1px solid var(--line, #d9e0e1); border-radius: 8px; display: grid; gap: 10px; grid-column: 1 / -1; grid-template-columns: minmax(160px, .7fr) minmax(120px, .45fr) minmax(0, 1fr); padding: 10px; }
+      .expense-vat-controls .check-row { min-height: 40px; }
+      .expense-vat-preview { color: #145c58; font-size: 13px; font-weight: 800; margin: 0; }
+      .expense-vat-button { min-width: 94px !important; white-space: nowrap !important; }
+      .expense-vat-button.is-on { background: #145c58 !important; color: #fff !important; }
+      .expense-vat-note { color: #687478; display: block; font-size: 12px; margin-top: 4px; }
+      @media (max-width: 760px) { .expense-vat-controls { grid-template-columns: 1fr; } }
     `;
     document.head.appendChild(style);
   }
@@ -116,9 +79,7 @@
     const controls = document.createElement("section");
     controls.className = "expense-vat-controls";
     controls.id = "expenseVatControls";
-    controls.innerHTML = `<label class="check-row"><input id="expenseVatEnabled" type="checkbox"> This expense has VAT</label>
-      <label>VAT rate %<input id="expenseVatRate" step="0.1" type="number" value="20"></label>
-      <p class="expense-vat-preview" id="expenseVatPreview">No VAT will be recorded for this expense.</p>`;
+    controls.innerHTML = `<label class="check-row"><input id="expenseVatEnabled" type="checkbox"> This expense has VAT</label><label>VAT rate %<input id="expenseVatRate" step="0.1" type="number" value="20"></label><p class="expense-vat-preview" id="expenseVatPreview">No VAT will be recorded for this expense.</p>`;
     if (notesLabel) notesLabel.insertAdjacentElement("beforebegin", controls);
     else els.expenseForm.appendChild(controls);
     controls.addEventListener("input", updateExpenseVatPreview, true);
@@ -138,11 +99,7 @@
 
   function latestMatchingExpense(snapshot) {
     const expenses = state.expenses || [];
-    return expenses.find((expense) =>
-      String(expense.date || "") === String(snapshot.date || "") &&
-      String(expense.payee || "") === String(snapshot.payee || "") &&
-      Number(expense.amount || 0) === Number(snapshot.amount || 0)
-    ) || expenses[0];
+    return expenses.find((expense) => String(expense.date || "") === String(snapshot.date || "") && String(expense.payee || "") === String(snapshot.payee || "") && Number(expense.amount || 0) === Number(snapshot.amount || 0)) || expenses[0];
   }
 
   function captureExpenseSnapshot() {
@@ -169,9 +126,7 @@
       button.title = vat.enabled && expense ? `VAT ${vat.rate}%: ${moneyText(vatAmountForExpense(expense))}` : "No VAT recorded for this expense";
       editButton.insertAdjacentElement("afterend", button);
       const payeeCell = actions.closest("tr")?.children?.[2];
-      if (payeeCell && vat.enabled && !payeeCell.querySelector(".expense-vat-note")) {
-        payeeCell.insertAdjacentHTML("beforeend", `<span class="expense-vat-note">VAT ${vat.rate}% recorded: ${moneyText(vatAmountForExpense(expense))}</span>`);
-      }
+      if (payeeCell && vat.enabled && !payeeCell.querySelector(".expense-vat-note")) payeeCell.insertAdjacentHTML("beforeend", `<span class="expense-vat-note">VAT ${vat.rate}% recorded: ${moneyText(vatAmountForExpense(expense))}</span>`);
     });
   }
 
@@ -198,12 +153,10 @@
     const invoices = (() => { try { return JSON.parse(localStorage.getItem("weset.invoices") || "[]"); } catch { return []; } })();
     const sentInvoices = invoices.filter((invoice) => invoice.status === "Sent" || invoice.sentAt);
     if (sentInvoices.length) return sentInvoices.reduce((sum, invoice) => sum + Number(invoice.vatAmount || 0), 0);
-    return (state.quotes || [])
-      .filter((quote) => ["Sent", "Accepted"].includes(quote.status || ""))
-      .reduce((sum, quote) => {
-        if (typeof window.wesetQuoteTotals === "function") return sum + Number(window.wesetQuoteTotals(quote).vatAmount || 0);
-        return sum;
-      }, 0);
+    return (state.quotes || []).filter((quote) => ["Sent", "Accepted"].includes(quote.status || "")).reduce((sum, quote) => {
+      if (typeof window.wesetQuoteTotals === "function") return sum + Number(window.wesetQuoteTotals(quote).vatAmount || 0);
+      return sum;
+    }, 0);
   }
 
   function vatPayments() {
@@ -220,12 +173,7 @@
     const paid = vatPayments().reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
     const remaining = netDue - paid;
     const remainingLabel = remaining < 0 ? "VAT credit / overpaid" : "Remaining VAT to pay";
-    list.innerHTML = `<div class="vat-summary-row"><span>VAT collected on sales</span><strong>${moneyText(salesVat)}</strong></div>
-      <div class="vat-summary-row"><span>VAT recorded on expenses</span><strong>${moneyText(inputVat)}</strong></div>
-      <div class="vat-summary-row"><span>Net VAT position</span><strong>${moneyText(netDue)}</strong></div>
-      <div class="vat-summary-row"><span>VAT payments / adjustments</span><strong>${moneyText(paid)}</strong></div>
-      <div class="vat-summary-row ${remaining < 0 ? "is-credit" : remaining > 0 ? "is-warning" : "is-total"}"><span>${remainingLabel}</span><strong>${moneyText(remaining)}</strong></div>
-      <p class="meta">Expense VAT is counted only when you mark that expense as VAT Yes.</p>`;
+    list.innerHTML = `<div class="vat-summary-row"><span>VAT collected on sales</span><strong>${moneyText(salesVat)}</strong></div><div class="vat-summary-row"><span>VAT recorded on expenses</span><strong>${moneyText(inputVat)}</strong></div><div class="vat-summary-row"><span>Net VAT position</span><strong>${moneyText(netDue)}</strong></div><div class="vat-summary-row"><span>VAT payments / adjustments</span><strong>${moneyText(paid)}</strong></div><div class="vat-summary-row ${remaining < 0 ? "is-credit" : remaining > 0 ? "is-warning" : "is-total"}"><span>${remainingLabel}</span><strong>${moneyText(remaining)}</strong></div><p class="meta">Expense VAT is counted only when you mark that expense as VAT Yes.</p>`;
   }
 
   function install() {
@@ -233,24 +181,18 @@
     ensureExpenseVatControls();
     enhanceExpenseRows();
     renderExplicitVatSummary();
-
     const oldRenderAccounting = typeof renderAccounting === "function" ? renderAccounting : null;
-    if (oldRenderAccounting) {
-      renderAccounting = function renderAccountingWithExplicitExpenseVat() {
-        oldRenderAccounting();
-        ensureExpenseVatControls();
-        enhanceExpenseRows();
-        renderExplicitVatSummary();
-      };
-    }
-
+    if (oldRenderAccounting) renderAccounting = function renderAccountingWithExplicitExpenseVat() { oldRenderAccounting(); ensureExpenseVatControls(); enhanceExpenseRows(); renderExplicitVatSummary(); };
     try { window.renderVatSummary = renderExplicitVatSummary; renderVatSummary = renderExplicitVatSummary; } catch { window.renderVatSummary = renderExplicitVatSummary; }
   }
 
   document.addEventListener("click", (event) => {
     const editButton = event.target.closest?.("[data-edit-expense]");
     const toggleButton = event.target.closest?.("[data-toggle-expense-vat]");
-    if (editButton) setTimeout(() => setFormExpenseVat(expenseVat(editButton.dataset.editExpense)), 0);
+    if (editButton) {
+      editingExpenseId = editButton.dataset.editExpense || "";
+      setTimeout(() => setFormExpenseVat(expenseVat(editingExpenseId)), 0);
+    }
     if (toggleButton) {
       event.preventDefault();
       event.stopPropagation();
@@ -261,11 +203,11 @@
   document.addEventListener("submit", (event) => {
     if (!event.target?.matches?.("#expenseForm")) return;
     const snapshot = captureExpenseSnapshot();
-    const editButtonVisible = document.querySelector("#expenseEditNote.is-visible");
-    const editingId = editButtonVisible ? document.querySelector("[data-edit-expense].is-editing")?.dataset.editExpense : "";
+    const submittedEditId = editingExpenseId;
     setTimeout(() => {
-      const expense = editingId ? expenseById(editingId) : latestMatchingExpense(snapshot);
+      const expense = submittedEditId ? expenseById(submittedEditId) : latestMatchingExpense(snapshot);
       if (expense?.id) saveExpenseVat(expense.id, snapshot.vat);
+      editingExpenseId = "";
       setFormExpenseVat({ enabled: false, rate: defaultRate });
       enhanceExpenseRows();
       renderExplicitVatSummary();
