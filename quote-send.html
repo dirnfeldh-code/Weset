@@ -7,8 +7,9 @@
   </head>
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet quote form...</p>
+    <script src="clear-local-data-fix.js?v=20260619-clear-local1"></script>
     <script>
-      const version = "20260619-accounting1";
+      const version = "20260619-clear-local1";
       const hash = location.hash || "#quotes";
       fetch("live.html?source=" + version)
         .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
