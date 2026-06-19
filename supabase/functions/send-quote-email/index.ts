@@ -17,7 +17,7 @@ function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 function safeName(reference?: string) { return (reference || "weset-document").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "") || "weset-document"; }
-function stripHtml(value = "") { return String(value).replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&pound;/g, "GBP ").replace(/£/g, "GBP ").replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/\n{3,}/g, "\n\n").trim(); }
+function stripHtml(value = "") { return String(value).replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&pound;/g, "£").replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/\n{3,}/g, "\n\n").trim(); }
 function removeRemoteImages(html = "") { return String(html).replace(/<img\b[^>]*>/gi, `<div style="display:inline-block;background:#ffffff;color:#145c58;border-radius:6px;padding:8px 12px;font-size:24px;font-weight:800;line-height:1;">WeSet</div>`); }
 function lineValue(text: string, label: string) { const line = text.split("\n").find((entry) => entry.toUpperCase().startsWith(`${label.toUpperCase()}:`)); return line ? line.slice(label.length + 1).trim() : ""; }
 function cleanPart(value: string, label: string) { return String(value || "").replace(new RegExp(`^${label}:\\s*`, "i"), "").trim(); }
@@ -47,7 +47,12 @@ function detailsFromPayload(payload: QuoteEmailPayload): PdfDetails {
     subtotal: lineValue(text, "SUBTOTAL") || "", vatLabel: lineValue(text, "VAT_LABEL") || "VAT", vatAmount: lineValue(text, "VAT_AMOUNT") || "", total: lineValue(text, "TOTAL") || ""
   };
 }
-function pdfEscape(value: string) { return String(value || "").replace(/[^\x20-\x7E]/g, " ").replace(/[\\()]/g, "\\$&"); }
+function pdfEscape(value: string) {
+  return String(value || "")
+    .replace(/£/g, "\\243")
+    .replace(/[^\x20-\x7E\\]/g, " ")
+    .replace(/[()]/g, "\\$&");
+}
 function wrapLine(line: string, max = 32) { const words = String(line || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean); const lines: string[] = []; let current = ""; for (const word of words) { if ((current + " " + word).trim().length > max) { if (current) lines.push(current); current = word; } else current = (current + " " + word).trim(); } if (current) lines.push(current); return lines.length ? lines : [""]; }
 function designedEmail(payload: QuoteEmailPayload) { if (payload.html) return removeRemoteImages(payload.html); return `<div style="margin:0;background:#eef5f4;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#1d2528;"><div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #d9e0e1;border-radius:8px;overflow:hidden;"><div style="background:#145c58;color:#ffffff;padding:24px 28px;"><div style="display:inline-block;background:#ffffff;color:#145c58;border-radius:6px;padding:8px 12px;font-size:24px;font-weight:800;line-height:1;">WeSet</div><h1 style="font-size:26px;line-height:1.2;margin:18px 0 0;">${payload.reference || "WeSet document"}</h1></div><div style="padding:24px 28px;font-size:15px;line-height:1.6;">${String(payload.text || "Please see attached PDF.").replaceAll("\n", "<br>")}</div></div></div>`; }
 function buildPdf(payload: QuoteEmailPayload) {
@@ -70,10 +75,28 @@ function buildPdf(payload: QuoteEmailPayload) {
 
   const top = 452; text(38, top, "#", 9, "F2"); text(66, top, "Product or service", 9, "F2"); text(202, top, "Description", 9, "F2"); rightText(370, top, "Qty", 9, "F2"); rightText(440, top, "Rate", 9, "F2"); rightText(510, top, "Amount", 9, "F2"); rightText(555, top, "VAT", 9, "F2"); line(40, top - 10, 555, top - 10);
   let y = top - 34;
-  d.items.slice(0, 8).forEach((item, index) => {
-    text(40, y, `${index + 1}.`, 8); wrapLine(item.product, 22).slice(0, 3).forEach((v, i) => text(66, y - i * 12, v, 8, i ? "F1" : "F2")); wrapLine(item.description, 34).slice(0, 3).forEach((v, i) => text(202, y - i * 12, v, 8)); rightText(370, y, item.qty, 8); rightText(440, y, item.rate, 8); rightText(510, y, item.amount, 8); rightText(555, y, item.vat, 8); y -= 58; line(40, y + 16, 555, y + 16, "0.88 0.90 0.91");
+  d.items.slice(0, 7).forEach((item, index) => {
+    text(40, y, `${index + 1}.`, 8);
+    wrapLine(item.product, 22).slice(0, 3).forEach((v, i) => text(66, y - i * 12, v, 8, i ? "F1" : "F2"));
+    wrapLine(item.description, 34).slice(0, 3).forEach((v, i) => text(202, y - i * 12, v, 8));
+    rightText(370, y, item.qty, 8);
+    rightText(440, y, item.rate, 8);
+    rightText(510, y, item.amount, 8);
+    rightText(555, y, item.vat, 8);
+    y -= 58;
+    line(40, y + 16, 555, y + 16, "0.88 0.90 0.91");
   });
-  const totalY = Math.max(64, y - 8); text(372, totalY + 48, d.vatLabel, 9); rightText(555, totalY + 48, d.vatAmount, 9); line(372, totalY + 30, 555, totalY + 30); text(372, totalY, "Total", 11, "F2"); rightText(555, totalY, d.total, 11, "F2");
+
+  const totalsTop = Math.max(90, y - 6);
+  line(360, totalsTop + 54, 555, totalsTop + 54, "0.88 0.90 0.91");
+  text(360, totalsTop + 38, "Subtotal", 9);
+  rightText(555, totalsTop + 38, d.subtotal, 9);
+  line(360, totalsTop + 25, 555, totalsTop + 25, "0.88 0.90 0.91");
+  text(360, totalsTop + 9, d.vatLabel, 9);
+  rightText(555, totalsTop + 9, d.vatAmount, 9);
+  line(360, totalsTop - 4, 555, totalsTop - 4, "0.82 0.85 0.87");
+  text(360, totalsTop - 28, "Total", 12, "F2");
+  rightText(555, totalsTop - 28, d.total, 12, "F2");
 
   const stream = ops.join("\n"); const objects = ["1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n", "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n", "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >> /Contents 5 0 R >>\nendobj\n", "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n", `5 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`, "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n"];
   let pdf = "%PDF-1.4\n"; const offsets = [0]; for (const object of objects) { offsets.push(pdf.length); pdf += object; } const xref = pdf.length; pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`; for (let i = 1; i < offsets.length; i++) pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`; pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`; return btoa(pdf);
