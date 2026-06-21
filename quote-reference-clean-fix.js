@@ -25,14 +25,34 @@
     return found || "";
   }
 
-  function buildReferenceMap() {
-    const saved = readJson(quoteMapKey, {});
-    const map = { ...saved };
-    const rows = [...quotes()];
-    let highest = Object.values(map).reduce((max, value) => {
+  function highestNumber(map) {
+    return Object.values(map).reduce((max, value) => {
       const number = Number(String(value || "").replace(/\D/g, ""));
       return Number.isFinite(number) ? Math.max(max, number) : max;
     }, 1000);
+  }
+
+  function nextReference(map) {
+    return `Q-${highestNumber(map) + 1}`;
+  }
+
+  function assignReference(id, map = null) {
+    const saved = map || buildReferenceMap(false);
+    const key = String(id || "");
+    if (!key) return "";
+    if (isFriendlyQuote(key)) return key.toUpperCase();
+    if (!saved[key]) {
+      saved[key] = nextReference(saved);
+      writeJson(quoteMapKey, saved);
+    }
+    return saved[key];
+  }
+
+  function buildReferenceMap(save = true) {
+    const saved = readJson(quoteMapKey, {});
+    const map = { ...saved };
+    const rows = [...quotes()];
+    let highest = highestNumber(map);
 
     rows.forEach((quote) => {
       const id = String(quote?.id || "");
@@ -52,7 +72,7 @@
         map[String(quote.id)] = `Q-${highest}`;
       });
 
-    writeJson(quoteMapKey, map);
+    if (save) writeJson(quoteMapKey, map);
     return map;
   }
 
@@ -61,7 +81,7 @@
     const id = String(quote?.id || input || "");
     if (isFriendlyQuote(id)) return id.toUpperCase();
     const map = buildReferenceMap();
-    return map[id] || "Q-1001";
+    return map[id] || assignReference(id, map) || "Q-1001";
   }
 
   function invoiceReferenceForQuoteId(id) {
@@ -71,13 +91,15 @@
   function replaceReferences(value) {
     let text = String(value ?? "");
     const map = buildReferenceMap();
+    const unknown = [...new Set(text.match(uuidPattern) || [])];
+    unknown.forEach((id) => assignReference(id, map));
     Object.entries(map).forEach(([id, ref]) => {
       if (!id || !ref) return;
       text = text.replaceAll(`INV-${id}`, `INV-${ref.replace(/^Q-?/i, "")}`);
       text = text.replaceAll(`Quote ${id}`, `Quote ${ref}`);
       text = text.replaceAll(id, ref);
     });
-    return text.replace(uuidPattern, (match) => map[match] || match);
+    return text.replace(uuidPattern, (match) => map[match] || assignReference(match, map) || match);
   }
 
   function repairInvoiceNumbers() {
@@ -146,8 +168,7 @@
   if (oldNextQuoteId) {
     nextQuoteId = function friendlyNextQuoteId() {
       const map = buildReferenceMap();
-      const highest = Math.max(1000, ...Object.values(map).map((value) => Number(String(value).replace(/\D/g, "")) || 1000));
-      return `Q-${highest + 1}`;
+      return nextReference(map);
     };
   }
 
