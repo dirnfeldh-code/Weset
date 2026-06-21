@@ -1,5 +1,7 @@
 (() => {
   const sectionIds = ["records", "actions", "reports"];
+  let organizeQueued = false;
+  let lastQuoteSelectSignature = "";
 
   const esc = (value) => String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -73,16 +75,8 @@
     return node?.closest(".panel") || null;
   }
 
-  function panelByHeading(text) {
-    const wanted = text.toLowerCase();
-    return [...document.querySelectorAll(".panel")].find((panel) => {
-      const heading = panel.querySelector("h2,h3")?.textContent?.trim().toLowerCase() || "";
-      return heading === wanted;
-    }) || null;
-  }
-
   function appendUnique(container, node) {
-    if (!container || !node || node.closest("#accountingWorkspaceShell") === container) return;
+    if (!container || !node || node.parentElement === container) return;
     if (node.id && container.querySelector(`#${CSS.escape(node.id)}`)) return;
     container.appendChild(node);
   }
@@ -115,10 +109,13 @@
   function populateInvoiceQuoteSelect() {
     const select = document.querySelector("#accountingInvoiceQuoteSelect");
     if (!select) return;
-    const current = select.value;
     const quotes = [...(state.quotes || [])].sort((a, b) => String(b.requiredDate || b.id).localeCompare(String(a.requiredDate || a.id)));
+    const signature = quotes.map((quote) => `${quote.id}:${quote.status}:${quote.clientId}:${quote.requiredDate || ""}`).join("|");
+    if (signature === lastQuoteSelectSignature && select.options.length) return;
+    const current = select.value;
     select.innerHTML = quotes.map((quote) => `<option value="${esc(quote.id)}">${esc(quoteLabel(quote))}</option>`).join("") || `<option value="">No quotes available</option>`;
     if ([...select.options].some((option) => option.value === current)) select.value = current;
+    lastQuoteSelectSignature = signature;
   }
 
   function createInvoiceFromAccounting() {
@@ -133,7 +130,7 @@
       const invoice = window.wesetCreateStoredInvoice(quoteId, "Unpaid");
       if (note) note.textContent = invoice ? `Invoice ${invoice.invoiceNumber} created. Open Records to view it or send it from the invoice row.` : "Could not create invoice from that quote.";
       if (typeof window.wesetRefreshAccountingReports === "function") window.wesetRefreshAccountingReports();
-      organize();
+      scheduleOrganize();
       return;
     }
     if (note) note.textContent = "Invoice creator is still loading. Refresh the app and try again.";
@@ -189,15 +186,29 @@
     });
   }
 
+  function scheduleOrganize(delay = 0) {
+    if (organizeQueued) return;
+    organizeQueued = true;
+    setTimeout(() => {
+      organizeQueued = false;
+      const run = () => organize();
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(run);
+      else run();
+    }, delay);
+  }
+
   const oldRenderAccounting = typeof renderAccounting === "function" ? renderAccounting : null;
   if (oldRenderAccounting) renderAccounting = function renderAccountingWithWorkspace() {
     oldRenderAccounting();
-    setTimeout(organize, 0);
+    scheduleOrganize();
   };
 
-  document.addEventListener("click", () => setTimeout(organize, 150), true);
-  document.addEventListener("submit", () => setTimeout(organize, 350), true);
-  window.addEventListener("hashchange", () => setTimeout(organize, 250));
-  setInterval(organize, 1400);
-  setTimeout(organize, 250);
+  document.addEventListener("click", () => scheduleOrganize(150), true);
+  document.addEventListener("submit", () => scheduleOrganize(350), true);
+  document.addEventListener("change", (event) => {
+    if (event.target?.matches?.("#accountingInvoiceQuoteSelect, #reportFromDate, #reportToDate, #reportCategoryFilter")) return;
+    scheduleOrganize(120);
+  }, true);
+  window.addEventListener("hashchange", () => scheduleOrganize(250));
+  scheduleOrganize(250);
 })();
