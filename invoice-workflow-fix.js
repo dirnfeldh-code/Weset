@@ -209,7 +209,8 @@
   function recordPaymentForInvoice(invoiceNumberValue, amount = null) {
     const invoice = invoices().find((entry) => entry.invoiceNumber === invoiceNumberValue);
     if (!invoice) return null;
-    const due = amount === null ? balanceDue(invoice) : Number(amount || 0);
+    const currentDue = balanceDue(invoice);
+    const due = amount === null ? currentDue : Number(amount || 0);
     if (!Number.isFinite(due) || due === 0) return null;
     const payment = {
       id: crypto.randomUUID(),
@@ -222,7 +223,8 @@
       notes: "Marked paid from invoice workflow"
     };
     savePayments([payment, ...payments()]);
-    const newStatus = balanceDue(invoice) - due <= 0.005 ? "Paid" : "Part paid";
+    const remaining = currentDue - due;
+    const newStatus = remaining <= 0.005 ? "Paid" : "Part paid";
     updateInvoice(invoice.invoiceNumber, { status: newStatus, paidAt: newStatus === "Paid" ? new Date().toISOString() : invoice.paidAt });
     return payment;
   }
