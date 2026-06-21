@@ -26,20 +26,8 @@
     return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 2 }).format(amount);
   }
 
-  function dateText(value) {
-    const raw = String(value || "").slice(0, 10);
-    if (!raw) return "No date";
-    if (typeof date === "function") return date(raw);
-    return raw;
-  }
-
   function today() {
     return new Date().toISOString().slice(0, 10);
-  }
-
-  function getClientSafe(id) {
-    if (typeof getClient === "function") return getClient(id);
-    return (state.clients || []).find((client) => String(client.id) === String(id)) || { company: "Client", contact: "", email: "" };
   }
 
   function quoteTotal(quote) {
@@ -183,6 +171,14 @@
     return { count: rows.length, total: rows.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) };
   }
 
+  function preserveScroll(work) {
+    const x = window.scrollX;
+    const y = window.scrollY;
+    const result = work();
+    requestAnimationFrame(() => window.scrollTo(x, y));
+    return result;
+  }
+
   function ensureStyles() {
     if (document.querySelector("#businessChainFixStyles")) return;
     const style = document.createElement("style");
@@ -198,7 +194,6 @@
       .business-chain-filter { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(220px, 1fr) auto auto; margin-top: 12px; }
       .business-chain-filter select, .business-chain-filter button { min-height: 38px; }
       .business-chain-note { background: #eef5f4; border: 1px solid var(--line,#d9e0e1); border-radius: 8px; color: #145c58; font-weight: 800; margin-top: 10px; padding: 9px 10px; }
-      .client-history-section .client-history-table td, .client-history-section .client-history-table th { white-space: normal; }
       @media (max-width: 720px) { .business-chain-filter { grid-template-columns: 1fr; } }
     `;
     document.head.appendChild(style);
@@ -232,7 +227,7 @@
       });
       panel.querySelector("#businessChainRefresh")?.addEventListener("click", () => {
         repairChain();
-        refreshEverything("Chain refreshed from quotes, invoices and payments.");
+        shallowRefresh("Chain refreshed from quotes, invoices and payments.");
       });
     }
     return panel;
@@ -287,37 +282,15 @@
     });
   }
 
-  function enhanceClientHistory(clientId) {
-    const dialog = document.querySelector("#clientHistoryDialog");
-    const body = document.querySelector("#clientHistoryBody");
-    if (!dialog?.open || !body || !clientId) return;
-    const clientInvoices = invoices().filter((invoice) => String(invoice.clientId) === String(clientId));
-    const clientPayments = payments().filter((payment) => String(payment.clientId) === String(clientId) || clientInvoices.some((invoice) => invoice.invoiceNumber === payment.invoiceNumber));
-    const totalQuoted = (state.quotes || []).filter((quote) => String(quote.clientId) === String(clientId)).reduce((sum, quote) => sum + quoteTotal(quote), 0);
-    const totalInvoiced = clientInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-    const totalPaid = clientPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-    const outstanding = clientInvoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.total || 0) - paymentsForInvoice(invoice.invoiceNumber)), 0);
-    if (!body.querySelector("#clientChainSummaryCards")) {
-      body.insertAdjacentHTML("afterbegin", `<div class="business-chain-grid" id="clientChainSummaryCards"></div>`);
-    }
-    const cards = body.querySelector("#clientChainSummaryCards");
-    cards.innerHTML = [
-      ["Total quoted", totalQuoted],
-      ["Total invoiced", totalInvoiced],
-      ["Total paid", totalPaid],
-      ["Outstanding", outstanding]
-    ].map(([label, value]) => `<article class="business-chain-card"><span>${esc(label)}</span><strong>${moneyText(value)}</strong></article>`).join("");
-  }
-
-  function refreshEverything(message = "") {
-    renderAccountingSummary();
-    removeLoosePaidButtons();
-    if (typeof window.wesetRefreshAccountingReports === "function") window.wesetRefreshAccountingReports();
-    if (typeof renderAccounting === "function") setTimeout(renderAccounting, 80);
-    if (message) {
-      const note = document.querySelector("#businessChainNote");
-      if (note) note.textContent = message;
-    }
+  function shallowRefresh(message = "") {
+    preserveScroll(() => {
+      renderAccountingSummary();
+      removeLoosePaidButtons();
+      if (message) {
+        const note = document.querySelector("#businessChainNote");
+        if (note) note.textContent = message;
+      }
+    });
   }
 
   function scheduleRefresh(delay = 0) {
@@ -326,7 +299,7 @@
     setTimeout(() => {
       refreshQueued = false;
       repairChain();
-      refreshEverything();
+      shallowRefresh();
     }, delay);
   }
 
@@ -334,11 +307,11 @@
   if (oldRenderAccounting) {
     renderAccounting = function renderAccountingWithBusinessChain() {
       oldRenderAccounting();
-      setTimeout(() => {
+      setTimeout(() => preserveScroll(() => {
         repairChain();
         renderAccountingSummary();
         removeLoosePaidButtons();
-      }, 0);
+      }), 0);
     };
   }
 
@@ -356,6 +329,7 @@
     const confirm = event.target.closest?.("#sendPreviewConfirm");
     const sendQuote = event.target.closest?.("[data-send-quote]");
     const paid = event.target.closest?.("[data-mark-invoice-paid], [data-mark-invoice-paid-workflow]");
+    const chainButton = event.target.closest?.("#businessChainRefresh, [data-record-invoice-payment], [data-send-stored-invoice], [data-invoice-quote]");
     if (confirm?.dataset.kind === "Quote") recordQuoteSend(confirm.dataset.quote);
     if (sendQuote?.dataset.sendQuote) recordQuoteSend(sendQuote.dataset.sendQuote);
     if (paid) {
@@ -368,25 +342,19 @@
       paid.textContent = "Record payment";
       paid.click();
     }
-    setTimeout(() => {
-      const openDialog = document.querySelector("#clientHistoryDialog[open]");
-      const title = openDialog?.querySelector("#clientHistoryTitle")?.textContent || "";
-      const client = (state.clients || []).find((entry) => (entry.company || "") === title);
-      if (client) enhanceClientHistory(client.id);
-      scheduleRefresh(0);
-    }, 220);
+    if (chainButton || confirm || sendQuote || paid) scheduleRefresh(300);
   }, true);
 
-  document.addEventListener("change", () => scheduleRefresh(220), true);
-  document.addEventListener("submit", () => scheduleRefresh(450), true);
+  document.addEventListener("submit", (event) => {
+    if (event.target?.matches?.("#clientPaymentForm, #quoteForm")) scheduleRefresh(600);
+  }, true);
   window.addEventListener("storage", () => scheduleRefresh(50));
 
   window.wesetRepairBusinessChain = () => {
     repairChain();
-    refreshEverything("Business chain repaired: duplicate records removed and invoice status recalculated from payments.");
+    shallowRefresh("Business chain repaired: duplicate records removed and invoice status recalculated from payments.");
     return { quotes: quoteStats(), invoices: invoiceStats(), payments: paymentStats() };
   };
 
-  setTimeout(() => { repairChain(); refreshEverything("Quote totals, invoice records and client payments are linked here."); }, 650);
-  setTimeout(() => { repairChain(); refreshEverything(); }, 2200);
+  setTimeout(() => { repairChain(); shallowRefresh("Quote totals, invoice records and client payments are linked here."); }, 650);
 })();
