@@ -131,7 +131,7 @@
   }
 
   function allCategories() {
-    const categories = new Set(["Sales", "VAT", "All expense categories"]);
+    const categories = new Set(["Sales", "VAT"]);
     (state.expenses || []).forEach((expense) => { if (expense.category) categories.add(expense.category); });
     return [...categories].sort((a, b) => a.localeCompare(b));
   }
@@ -157,13 +157,16 @@
   }
 
   function filteredInvoices(filters = currentFilters()) {
+    if (filters.category && !["all", "Sales", "VAT"].includes(filters.category)) return [];
     return reportState.invoices.filter((invoice) => inPeriod(invoiceDate(invoice), filters));
   }
 
   function filteredExpenses(filters = currentFilters()) {
     return (state.expenses || []).filter((expense) => {
       if (!inPeriod(expense.date, filters)) return false;
-      if (filters.category && !["all", "Sales", "VAT", "All expense categories"].includes(filters.category) && expense.category !== filters.category) return false;
+      if (filters.category === "Sales") return false;
+      if (filters.category === "VAT") return expenseVatAmount(expense) !== 0;
+      if (filters.category && filters.category !== "all" && expense.category !== filters.category) return false;
       return true;
     });
   }
