@@ -364,7 +364,7 @@
     renderReportsOnly();
     if (typeof sbIsConnected !== "function" || !sbIsConnected() || typeof sbRequest !== "function") return alert("Marked as paid in the app. Sign in to Supabase if you also want this saved to Supabase.");
     try {
-      await sbRequest(`invoices?invoice_number=eq.${encodeURIComponent(invoiceNumber)}`, { method: "PATCH", body: { status: "Paid", paid_at: paidAt } });
+      await sbRequest(`invoices?invoice_number=eq.${encodeURIComponent(invoiceNumber)}`, { method: "PATCH", body: { status: "Paid" } });
       alert(`${invoiceNumber} marked as paid in the app and Supabase.`);
     } catch (error) {
       alert(`Marked as paid in the app, but Supabase did not save it yet: ${error.message || "check the invoices table."}`);
