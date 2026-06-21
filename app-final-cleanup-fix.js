@@ -1,5 +1,6 @@
 (() => {
   const sessionKeyName = typeof sessionKey !== "undefined" ? sessionKey : "we-set-session";
+  const invoiceStoreKey = "weset.invoices";
 
   function hasSession() {
     try {
@@ -8,6 +9,14 @@
     } catch (_) {
       return false;
     }
+  }
+
+  function readJson(key, fallback = []) {
+    try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch (_) { return fallback; }
+  }
+
+  function invoiceForQuote(quoteId) {
+    return readJson(invoiceStoreKey, []).find((invoice) => String(invoice.quoteId || invoice.quote_id) === String(quoteId));
   }
 
   function ensureStyles() {
@@ -91,13 +100,43 @@
     });
   }
 
+  function normalizeOldQuoteButtons() {
+    document.querySelectorAll("[data-send-in-app]").forEach((button) => {
+      button.dataset.stageSendQuote = button.dataset.sendInApp;
+      button.removeAttribute("data-send-in-app");
+      button.textContent = "Send quote";
+      button.classList.add("clean-primary-action");
+    });
+
+    document.querySelectorAll("[data-invoice-quote]").forEach((button) => {
+      const quoteId = button.dataset.invoiceQuote;
+      button.dataset.stageInvoiceQuote = quoteId;
+      button.removeAttribute("data-invoice-quote");
+      button.textContent = invoiceForQuote(quoteId) ? "Open invoice" : "Create invoice";
+      button.classList.add("secondary");
+    });
+
+    document.querySelectorAll("[data-send-invoice]").forEach((button) => button.remove());
+    document.querySelectorAll('[data-edit-document][data-document-kind="Invoice"]').forEach((button) => button.remove());
+
+    document.querySelectorAll("[data-edit-document][data-document-kind='Quote'], [data-edit-document][data-document-kind=Quote]").forEach((button) => {
+      button.textContent = "Edit quote";
+      button.classList.add("secondary");
+      const quoteId = button.dataset.editDocument;
+      document.querySelectorAll(`[data-edit-quote="${CSS.escape(quoteId)}"]`).forEach((oldButton) => oldButton.remove());
+    });
+  }
+
   function cleanupQuoteActions() {
+    normalizeOldQuoteButtons();
     document.querySelectorAll("[data-send-quote], .stage-hidden").forEach((button) => {
       if (/prepare email/i.test(button.textContent || "")) button.remove();
     });
     document.querySelectorAll("[data-status]").forEach((button) => {
-      const status = String(button.dataset.status || "").split(":").pop()?.toLowerCase();
+      const [quoteId, rawStatus] = String(button.dataset.status || "").split(":");
+      const status = String(rawStatus || "").toLowerCase();
       if (status === "sent") button.remove();
+      if (invoiceForQuote(quoteId) && ["accepted", "declined"].includes(status)) button.remove();
       if (status === "accepted") button.textContent = "Mark accepted";
       if (status === "declined") button.textContent = "Decline";
     });
@@ -177,7 +216,7 @@
   window.addEventListener("storage", schedule);
 
   const observer = new MutationObserver(schedule);
-  if (document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-status", "data-record-invoice-payment", "data-mark-invoice-paid"] });
+  if (document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-status", "data-record-invoice-payment", "data-mark-invoice-paid", "data-send-in-app", "data-invoice-quote"] });
   setTimeout(runCleanup, 250);
   setTimeout(runCleanup, 1200);
   setInterval(runCleanup, 3500);
