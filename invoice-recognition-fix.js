@@ -64,7 +64,8 @@
       const wrappedCreate = async function createInvoiceAndRefresh(...args) {
         const result = await originalCreate.apply(this, args);
         lastInvoiceSnapshot = localStorage.getItem(invoiceStoreKey) || "[]";
-        refreshAccountingInvoices(`Invoice ${result?.record?.invoiceNumber || ""} is now recorded in invoices, reports and client payments.`.trim());
+        const invoiceNumber = result?.record?.invoiceNumber || "";
+        refreshAccountingInvoices(invoiceNumber ? `Invoice ${invoiceNumber} is now recorded in invoices, reports and client payments.` : "Invoice is now recorded in invoices, reports and client payments.");
         return result;
       };
       wrappedCreate.__recognitionWrapped = true;
