@@ -104,14 +104,17 @@ async function sbLoadAll() {
 }
 
 async function sbEnsureDefaultItems(existingRows) {
-  if (!Array.isArray(defaultCatalog)) return existingRows;
+  const defaultItems = typeof defaultCatalog !== "undefined" && Array.isArray(defaultCatalog)
+    ? defaultCatalog
+    : (typeof catalog !== "undefined" && Array.isArray(catalog) ? catalog : []);
+  if (!defaultItems.length) return existingRows;
   const seedKey = "weset.supabase.itemsSeeded";
   if (existingRows.length) {
     localStorage.setItem(seedKey, "true");
     return existingRows;
   }
   if (localStorage.getItem(seedKey) === "true") return existingRows;
-  const starterItems = defaultCatalog.map((item) => ({
+  const starterItems = defaultItems.map((item) => ({
     name: item.name,
     category: item.category,
     unit_cost: Number(item.unitCost || 0),
@@ -318,7 +321,7 @@ async function sbLookupPostcodeAddress(fields, label) {
     fields.postcode.value = postcode;
     updateAddressPreview(fields);
     fields.status.textContent = "Postcode found. Add the building number and street to complete the address.";
-    fields.status.className = "address-status is-ok";
+    fields.status.className = "is-ok";
   } catch {
     fields.status.textContent = "Could not find that postcode. Check it or enter the address manually.";
     fields.status.className = "address-status is-warn";
