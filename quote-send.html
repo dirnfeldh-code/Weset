@@ -8,7 +8,7 @@
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
     <script>
-      const version = "20260622-logout1";
+      const version = "20260622-logout2";
       const hash = location.hash || "#dashboard";
       const fixes = [
         "clear-local-data-fix.js",
@@ -79,7 +79,7 @@
           const fixScripts = fixes.map((src) => `<script src="${src}?v=${version}"><\/script>`).join("");
           html = html
             .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
-            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
+            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}`)
             .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
             .replace("</body>", `${fixScripts}</body>`);
           document.open();
