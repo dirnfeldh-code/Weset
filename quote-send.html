@@ -1,73 +1,86 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WeSet Office Setup</title>
-  <script>
-    (function(){
-      var key = "weset_clear_local_once_v1";
-      if (!localStorage.getItem(key)) {
-        ["weset_clients","weset_quotes","weset_installations","weset_expenses","weset_users","weset_dashboard","weset_selected_client","weset_current_quote","weset_demo_seeded"].forEach(function(name){
-          try { localStorage.removeItem(name); } catch (error) {}
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WeSet | Office Setup Console</title>
+  </head>
+  <body>
+    <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
+    <script>
+      const version = "20260621-stage10";
+      const hash = location.hash || "#dashboard";
+      const fixes = [
+        "clear-local-data-fix.js",
+        "users-fix.js",
+        "password-reset.js",
+        "login-fix.js",
+        "compat-fix.js",
+        "display-fix.js",
+        "quote-label-fix.js",
+        "supabase-bridge-fix.js",
+        "item-fix.js",
+        "client-fix.js",
+        "address-fix.js",
+        "quote-form-fix.js",
+        "quote-amend-fix.js",
+        "modal-layout-fix.js",
+        "email-preview-fix.js",
+        "quote-send-fix.js",
+        "edge-email-design-fix.js",
+        "pdf-layout-fix.js",
+        "invoice-pdf-layout-fix.js",
+        "pdf-preview-layout-fix.js",
+        "email-preview-layout-fix.js",
+        "settings-table-fix.js",
+        "settings-ui-fix.js",
+        "quote-template-override-fix.js",
+        "quote-line-dropdown-fix.js",
+        "app-layout-cleanup-fix.js",
+        "items-page-cleanup-fix.js",
+        "accounting-expense-vat-fix.js",
+        "expense-vat-ui-fix.js",
+        "accounting-live-fix.js",
+        "payments-accounting-fix.js",
+        "invoice-workflow-fix.js",
+        "invoice-recording-fix.js",
+        "invoice-payment-workflow-fix.js",
+        "quote-dashboard-client-history-fix.js",
+        "accounting-workspace-cleanup.js",
+        "smooth-accounting-refresh-fix.js",
+        "payment-option-restore-fix.js",
+        "expand-window-fix.js",
+        "silent-refresh-fix.js",
+        "auth-session-keepalive-fix.js",
+        "quote-chain-workflow-fix.js",
+        "accounting-page-stability-fix.js",
+        "quote-workflow-rules-fix.js",
+        "expand-button-inline-fix.js",
+        "quote-reference-clean-fix.js",
+        "invoice-chain-sync-fix.js",
+        "app-final-cleanup-fix.js",
+        "button-polish-fix.js",
+        "button-polish-final-fix.js",
+        "button-table-card-fix.js"
+      ];
+
+      fetch("live.html?source=" + version)
+        .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
+        .then((html) => {
+          const fixScripts = fixes.map((src) => `<script src="${src}?v=${version}"><\/script>`).join("");
+          html = html
+            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
+            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
+            .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
+            .replace("</body>", `${fixScripts}</body>`);
+          document.open();
+          document.write(html);
+          document.close();
+          if (location.hash !== hash) location.hash = hash;
+        })
+        .catch(() => {
+          document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 18px;'>Could not load WeSet. Please refresh.</p>";
         });
-        localStorage.setItem(key, "done");
-      }
-    })();
-  </script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="style.css?v=20260621-stage10" />
-</head>
-<body>
-  <div id="app"></div>
-  <script src="clear-local-data-fix.js?v=20260621-stage10"></script>
-  <script src="app.js?v=20260621-stage10"></script>
-  <script>
-    const version = "20260621-stage10";
-    const scripts = [
-      "email-preview-fix.js",
-      "quote-send-fix.js",
-      "edge-email-design-fix.js",
-      "pdf-layout-fix.js",
-      "invoice-pdf-layout-fix.js",
-      "pdf-preview-layout-fix.js",
-      "email-preview-layout-fix.js",
-      "settings-table-fix.js",
-      "settings-ui-fix.js",
-      "quote-template-override-fix.js",
-      "quote-line-dropdown-fix.js",
-      "app-layout-cleanup-fix.js",
-      "items-page-cleanup-fix.js",
-      "accounting-expense-vat-fix.js",
-      "expense-vat-ui-fix.js",
-      "accounting-live-fix.js",
-      "payments-accounting-fix.js",
-      "invoice-workflow-fix.js",
-      "invoice-recording-fix.js",
-      "invoice-payment-workflow-fix.js",
-      "quote-dashboard-client-history-fix.js",
-      "accounting-workspace-cleanup.js",
-      "smooth-accounting-refresh-fix.js",
-      "payment-option-restore-fix.js",
-      "expand-window-fix.js",
-      "silent-refresh-fix.js",
-      "auth-session-keepalive-fix.js",
-      "quote-chain-workflow-fix.js",
-      "accounting-page-stability-fix.js",
-      "quote-workflow-rules-fix.js",
-      "expand-button-inline-fix.js",
-      "quote-reference-clean-fix.js",
-      "invoice-chain-sync-fix.js",
-      "app-final-cleanup-fix.js",
-      "button-polish-fix.js",
-      "button-polish-final-fix.js",
-      "button-table-card-fix.js"
-    ];
-    scripts.forEach((src) => {
-      const script = document.createElement("script");
-      script.src = `${src}?v=${version}`;
-      document.body.appendChild(script);
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
