@@ -8,24 +8,7 @@
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
     <script>
-      const version = "20260616-connect5";
-      const hash = location.hash || "#dashboard";
-      fetch("live.html?source=" + version)
-        .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
-        .then((html) => {
-          html = html
-            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
-            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
-            .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
-            .replace("</body>", `<script src="users-fix.js?v=${version}"><\/script><script src="password-reset.js?v=${version}"><\/script><script src="login-fix.js?v=${version}"><\/script><script src="compat-fix.js?v=${version}"><\/script><script src="display-fix.js?v=${version}"><\/script><script src="quote-label-fix.js?v=${version}"><\/script></body>`);
-          document.open();
-          document.write(html);
-          document.close();
-          if (location.hash !== hash) location.hash = hash;
-        })
-        .catch(() => {
-          document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 18px;'>Could not load WeSet. Please refresh.</p>";
-        });
+      location.replace(`quote-send.html?cache=20260622-full-current1${location.hash || "#dashboard"}`);
     </script>
   </body>
 </html>
