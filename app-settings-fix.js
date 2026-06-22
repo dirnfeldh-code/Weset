@@ -62,8 +62,43 @@
     style.id = "appSettingsStyles";
     style.textContent = `
       .app-settings-button {
-        min-height: 38px !important;
         white-space: nowrap !important;
+      }
+      .topbar .header-icon-tools {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        margin-right: 12px;
+      }
+      .topbar > .header-title-wrap {
+        min-width: 0;
+      }
+      .topbar .app-icon-action {
+        align-items: center !important;
+        border-radius: 8px !important;
+        display: inline-flex !important;
+        height: 38px !important;
+        justify-content: center !important;
+        min-height: 38px !important;
+        min-width: 38px !important;
+        padding: 0 !important;
+        width: 38px !important;
+      }
+      .topbar .app-icon-action svg {
+        display: block;
+        height: 18px;
+        width: 18px;
+      }
+      .topbar .app-icon-action .button-text {
+        border: 0;
+        clip: rect(0 0 0 0);
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        padding: 0;
+        position: absolute;
+        white-space: nowrap;
+        width: 1px;
       }
       .app-settings-dialog {
         border: 0;
@@ -99,6 +134,10 @@
       .app-settings-status.is-warn { color: #7c2d12; }
       .app-settings-actions { border-top: 1px solid var(--line, #d9e0e1); flex-wrap: wrap; }
       @media (max-width: 720px) {
+        .topbar .header-icon-tools {
+          align-self: flex-start;
+          margin: 0 0 8px;
+        }
         .app-settings-grid { grid-template-columns: 1fr; }
         .app-settings-grid .span-2 { grid-column: 1; }
         .app-settings-actions { align-items: stretch; display: grid; grid-template-columns: 1fr; }
@@ -237,16 +276,40 @@
 
   function ensureButton() {
     const actions = document.querySelector(".top-actions");
-    if (!actions || document.querySelector("#appSettingsBtn")) return;
-    const button = document.createElement("button");
-    button.id = "appSettingsBtn";
-    button.className = "secondary app-settings-button";
-    button.type = "button";
-    button.textContent = "Settings";
+    const topbar = document.querySelector(".topbar");
+    if (!actions || !topbar) return;
+
+    const title = topbar.firstElementChild;
+    if (title && !title.classList.contains("header-title-wrap")) title.classList.add("header-title-wrap");
+
+    let tools = document.querySelector(".header-icon-tools");
+    if (!tools) {
+      tools = document.createElement("div");
+      tools.className = "header-icon-tools";
+      topbar.insertBefore(tools, title || topbar.firstChild);
+    }
+
+    let settings = document.querySelector("#appSettingsBtn");
+    if (!settings) {
+      settings = document.createElement("button");
+      settings.id = "appSettingsBtn";
+      settings.type = "button";
+      settings.addEventListener("click", openSettings);
+    }
+    settings.className = "secondary app-settings-button app-icon-action";
+    settings.setAttribute("aria-label", "Settings");
+    settings.setAttribute("title", "Settings");
+    settings.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13.5a7.9 7.9 0 0 0 0-3l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8 8 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.9 7.9 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5L10 21.5h4l.4-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span class="button-text">Settings</span>`;
+    tools.appendChild(settings);
+
     const logout = document.querySelector("#logoutBtn");
-    if (logout) actions.insertBefore(button, logout);
-    else actions.appendChild(button);
-    button.addEventListener("click", openSettings);
+    if (logout) {
+      logout.className = "secondary app-icon-action";
+      logout.setAttribute("aria-label", "Log out");
+      logout.setAttribute("title", "Log out");
+      logout.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 5H5.8A1.8 1.8 0 0 0 4 6.8v10.4A1.8 1.8 0 0 0 5.8 19H10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M14 8l4 4-4 4M18 12H9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="button-text">Log out</span>`;
+      tools.appendChild(logout);
+    }
   }
 
   function install() {
