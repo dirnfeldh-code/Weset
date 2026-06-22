@@ -20,6 +20,7 @@
         min-height: 34px !important;
         padding: 7px 10px !important;
       }
+      .panel-head button { min-width: 64px !important; }
       .icon-btn { aspect-ratio: 1 / 1; min-width: 34px !important; width: 34px !important; }
       .card-actions, .quote-record-actions, .invoice-row-actions, .stage-action-row, .catalog-item .card-actions {
         align-items: center !important;
