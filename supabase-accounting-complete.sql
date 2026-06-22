@@ -32,6 +32,29 @@ create table if not exists public.invoices (
   updated_at timestamptz not null default now()
 );
 
+alter table public.invoices
+  add column if not exists invoice_number text,
+  add column if not exists quote_id uuid null references public.quotes(id) on delete set null,
+  add column if not exists client_id uuid null references public.clients(id) on delete set null,
+  add column if not exists status text not null default 'Unpaid',
+  add column if not exists subtotal numeric not null default 0,
+  add column if not exists vat_enabled boolean not null default false,
+  add column if not exists vat_rate numeric not null default 0,
+  add column if not exists vat_amount numeric not null default 0,
+  add column if not exists total numeric not null default 0,
+  add column if not exists invoice_html text,
+  add column if not exists due_date date,
+  add column if not exists terms text,
+  add column if not exists notes text,
+  add column if not exists sent_at timestamptz,
+  add column if not exists paid_at timestamptz,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+create unique index if not exists invoices_invoice_number_key
+  on public.invoices(invoice_number)
+  where invoice_number is not null;
+
 create table if not exists public.client_payments (
   id uuid primary key default gen_random_uuid(),
   payment_date date not null default current_date,
@@ -124,3 +147,5 @@ values
   ('Office overheads'),
   ('Other')
 on conflict (name) do nothing;
+
+notify pgrst, 'reload schema';
