@@ -22,15 +22,36 @@
     }
   }
 
+  function ensureLogoutStyles() {
+    if (document.querySelector("#wesetLogoutFixStyles")) return;
+    const style = document.createElement("style");
+    style.id = "wesetLogoutFixStyles";
+    style.textContent = `
+      body.weset-logged-out .app-shell,
+      body.weset-logged-out #logoutBtn {
+        display: none !important;
+      }
+      body.weset-logged-out #loginScreen {
+        display: flex !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function setLoggedOutView(message = "") {
     const login = document.querySelector("#loginScreen");
     const shell = document.querySelector(".app-shell");
     const error = document.querySelector("#loginError");
 
+    ensureLogoutStyles();
     document.body.classList.add("weset-logged-out");
     document.body.classList.remove("weset-logged-in");
     login?.classList.remove("is-hidden", "cleanup-hidden");
-    if (shell) shell.style.display = "none";
+    login?.removeAttribute("aria-hidden");
+    if (shell) {
+      shell.style.display = "none";
+      shell.setAttribute("aria-hidden", "true");
+    }
     if (error && message) {
       error.textContent = message;
       error.style.color = "#157a5b";
@@ -38,10 +59,15 @@
   }
 
   function setLoggedInView() {
+    const login = document.querySelector("#loginScreen");
     const shell = document.querySelector(".app-shell");
     document.body.classList.add("weset-logged-in");
     document.body.classList.remove("weset-logged-out");
-    if (shell) shell.style.display = "";
+    login?.setAttribute("aria-hidden", "true");
+    if (shell) {
+      shell.style.display = "";
+      shell.removeAttribute("aria-hidden");
+    }
   }
 
   function syncAuthView() {
