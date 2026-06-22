@@ -58,28 +58,7 @@
   }
 
   function ensurePanel() {
-    const accounting = document.querySelector("#accountingView");
-    if (!accounting || document.querySelector("#companySettingsPanel")) return;
-    const current = details();
-    const panel = document.createElement("section");
-    panel.className = "panel";
-    panel.id = "companySettingsPanel";
-    panel.innerHTML = `<div class="panel-head"><h2>Company details</h2><span class="badge Complete" id="companySettingsStatus">Used on quotes and invoices</span></div>
-      <form id="companySettingsForm" class="form-grid">
-        <label>Company name<input id="companyName" value="${esc(current.name)}" required></label>
-        <label>Accounts email<input id="companyEmail" type="email" value="${esc(current.email)}" required></label>
-        <label>Phone number<input id="companyPhone" value="${esc(current.phone)}"></label>
-        <label>Payment terms<input id="companyTerms" value="${esc(current.terms)}" placeholder="Net 15"></label>
-        <label>Address line 1<input id="companyAddress1" value="${esc(current.address1)}"></label>
-        <label>Address line 2<input id="companyAddress2" value="${esc(current.address2)}"></label>
-        <label>VAT / registration details<input id="companyVat" value="${esc(current.vat)}"></label>
-        <label>Logo URL<input id="companyLogoUrl" value="${esc(current.logoUrl)}" placeholder="assets/weset-logo-live.jpg"></label>
-        <button class="primary span-2" type="submit">Save company details</button>
-      </form>`;
-    const firstLowerGrid = accounting.querySelector(".accounting-grid.lower");
-    if (firstLowerGrid) firstLowerGrid.insertAdjacentElement("beforebegin", panel);
-    else accounting.appendChild(panel);
-    panel.querySelector("#companySettingsForm")?.addEventListener("submit", saveFromForm);
+    document.querySelector("#companySettingsPanel")?.remove();
   }
 
   async function saveFromForm(event) {
