@@ -5,8 +5,18 @@
     style.id = "buttonTableCardFixStyles";
     style.textContent = `
       @media (max-width: 760px) {
+        #clientsTable, #clientsTable tbody,
+        #usersTable, #usersTable tbody,
+        #liveInvoicesTable, #liveInvoicesTable tbody,
+        #expensesTable, #expensesTable tbody,
+        #salesTable, #salesTable tbody,
+        #monthlyAccounts, #monthlyAccounts tbody {
+          display: block !important;
+          width: 100% !important;
+        }
         #clientsTable tr, #usersTable tr, #liveInvoicesTable tr, #expensesTable tr, #salesTable tr, #monthlyAccounts tr {
           display: grid !important;
+          gap: 8px !important;
           grid-template-columns: minmax(0, 1fr) !important;
           width: 100% !important;
         }
@@ -19,23 +29,27 @@
         #clientsTable td:last-child, #usersTable td:last-child, #liveInvoicesTable td:last-child, #expensesTable td:last-child, #salesTable td:last-child, #monthlyAccounts td:last-child,
         #clientsTable .client-row-actions, #usersTable .user-row-actions {
           display: grid !important;
-          gap: 7px !important;
-          grid-template-columns: minmax(0, 1fr) !important;
+          gap: 8px !important;
+          grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)) !important;
           min-width: 0 !important;
           width: 100% !important;
         }
         #clientsTable .client-row-actions .card-actions, #usersTable .user-row-actions .card-actions,
         #liveInvoicesTable .invoice-row-actions, #expensesTable td:last-child .button-polish-row {
           display: grid !important;
-          gap: 7px !important;
-          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 8px !important;
+          grid-column: 1 / -1 !important;
+          grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)) !important;
           width: 100% !important;
         }
-        #clientsTable .client-row-actions > button, #usersTable .user-row-actions > button,
-        #clientsTable .client-row-actions .card-actions button, #usersTable .user-row-actions .card-actions button,
-        #liveInvoicesTable .invoice-row-actions button, #expensesTable td:last-child button, #salesTable td:last-child button, #monthlyAccounts td:last-child button {
+        #clientsTable button, #usersTable button, #liveInvoicesTable button, #expensesTable button, #salesTable button, #monthlyAccounts button {
           box-sizing: border-box !important;
-          min-width: 0 !important;
+          justify-content: center !important;
+          min-height: 36px !important;
+          min-width: 88px !important;
+          padding-left: 12px !important;
+          padding-right: 12px !important;
+          white-space: nowrap !important;
           width: 100% !important;
         }
       }
