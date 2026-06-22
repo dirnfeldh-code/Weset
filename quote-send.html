@@ -79,7 +79,7 @@
           const fixScripts = fixes.map((src) => `<script src="${src}?v=${version}"><\/script>`).join("");
           html = html
             .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
-            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}`)
+            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
             .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
             .replace("</body>", `${fixScripts}</body>`);
           document.open();
