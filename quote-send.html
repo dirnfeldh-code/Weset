@@ -1,103 +1,104 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WeSet | Office Setup Console</title>
-</head>
-<body>
-<p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
-<script>
-const version = "20260623-polish5";
-const hash = location.hash || "#dashboard";
-const fixes = [
-"clear-local-data-fix.js",
-"users-fix.js",
-"password-reset.js",
-"login-fix.js",
-"email-auth-fix.js",
-"jwt-refresh-fix.js",
-"session-persist-fix.js",
-"compat-fix.js",
-"connection-error-fix.js",
-"supabase-health-fix.js",
-"display-fix.js",
-"quote-label-fix.js",
-"item-fix.js",
-"items-seed-fix.js",
-"client-fix.js",
-"clear-fix.js",
-"company-settings-fix.js",
-"quote-edit-fix.js",
-"quote-modal-fix.js",
-"quote-columns-fix.js",
-"quote-vat-invoice-fix.js",
-"quote-document-edit-fix.js",
-"quote-document-email-fix.js",
-"quote-document-item-dropdown-fix.js",
-"quote-stage-workflow-fix.js",
-"quote-stage-strict-accepted-fix.js",
-"client-quote-workflow-fix.js",
-"client-payments-fix.js",
-"business-chain-fix.js",
-"chain-integrity-cleanup-fix.js",
-"accounting-upgrade-fix.js",
-"accounting-workspace-fix.js",
-"accounting-reports-fix.js",
-"accounting-clean-layout-fix.js",
-"accounting-anti-jump-fix.js",
-"stop-blink-timers-fix.js",
-"expense-vat-record-fix.js",
-"negative-calculation-fix.js",
-"vat-exclusive-calculation-fix.js",
-"invoice-workflow-fix.js",
-"invoice-send-fix.js",
-"invoice-recognition-fix.js",
-"invoice-accounting-record-fix.js",
-"invoice-chain-sync-fix.js",
-"payment-visibility-fix.js",
-"status-updated-at-fix.js",
-"email-pdf-clean-fix.js",
-"ui-email-fix.js",
-"send-preview-confirm-fix.js",
-"expand-window-fix.js",
-"app-fit-screen-fix.js",
-"document-fit-screen-fix.js",
-"design-cleanup-fix.js",
-"readability-actions-fix.js",
-"delete-button-layout-fix.js",
-"quote-reference-clean-fix.js",
-"app-final-cleanup-fix.js",
-"logout-fix.js",
-"app-settings-fix.js",
-"supabase-accounting-sync-fix.js",
-"button-polish-fix.js",
-"button-polish-final-fix.js",
-"button-table-card-fix.js",
-"app-quality-cleanup-fix.js",
-"accounting-records-clean-fix.js",
-"app-professional-polish-fix.js"
-];
-fetch("live.html?source=" + version)
-.then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
-.then((html) => {
-const fixScripts = fixes.map((src) => `<script src="${src}?v=${version}"><\/script>`).join("");
-const bootStyle = `<style id="wesetBootStyle">html:not(.weset-ready) body{opacity:0;visibility:hidden}html.weset-ready body{opacity:1;transition:opacity .12s ease;visibility:visible}</style>`;
-const readyScript = `<script>setTimeout(function(){document.documentElement.classList.add("weset-ready");var boot=document.getElementById("wesetBootStyle");if(boot)boot.remove();},80);<\/script>`;
-html = html
-.replace("</head>", `${bootStyle}</head>`)
-.replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
-.replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
-.replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
-.replace("</body>", `${fixScripts}${readyScript}</body>`);
-document.open();
-document.write(html);
-document.close();
-if (location.hash !== hash) location.hash = hash;
-})
-.catch(() => {
-document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 18px;'>Could not load WeSet. Please refresh.</p>";
-});
-</script>
-</body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WeSet | Office Setup Console</title>
+  </head>
+  <body>
+    <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
+    <script>
+      const version = "20260623-accounting-expand1";
+      const hash = location.hash || "#dashboard";
+      const fixes = [
+        "clear-local-data-fix.js",
+        "users-fix.js",
+        "password-reset.js",
+        "login-fix.js",
+        "email-auth-fix.js",
+        "jwt-refresh-fix.js",
+        "session-persist-fix.js",
+        "compat-fix.js",
+        "connection-error-fix.js",
+        "supabase-health-fix.js",
+        "display-fix.js",
+        "quote-label-fix.js",
+        "item-fix.js",
+        "items-seed-fix.js",
+        "client-fix.js",
+        "clear-fix.js",
+        "company-settings-fix.js",
+        "quote-edit-fix.js",
+        "quote-modal-fix.js",
+        "quote-columns-fix.js",
+        "quote-vat-invoice-fix.js",
+        "quote-document-edit-fix.js",
+        "quote-document-email-fix.js",
+        "quote-document-item-dropdown-fix.js",
+        "quote-stage-workflow-fix.js",
+        "quote-stage-strict-accepted-fix.js",
+        "client-quote-workflow-fix.js",
+        "client-payments-fix.js",
+        "business-chain-fix.js",
+        "chain-integrity-cleanup-fix.js",
+        "accounting-upgrade-fix.js",
+        "accounting-workspace-fix.js",
+        "accounting-reports-fix.js",
+        "accounting-clean-layout-fix.js",
+        "accounting-anti-jump-fix.js",
+        "stop-blink-timers-fix.js",
+        "expense-vat-record-fix.js",
+        "negative-calculation-fix.js",
+        "vat-exclusive-calculation-fix.js",
+        "invoice-workflow-fix.js",
+        "invoice-send-fix.js",
+        "invoice-recognition-fix.js",
+        "invoice-accounting-record-fix.js",
+        "invoice-chain-sync-fix.js",
+        "payment-visibility-fix.js",
+        "status-updated-at-fix.js",
+        "email-pdf-clean-fix.js",
+        "ui-email-fix.js",
+        "send-preview-confirm-fix.js",
+        "expand-window-fix.js",
+        "app-fit-screen-fix.js",
+        "document-fit-screen-fix.js",
+        "design-cleanup-fix.js",
+        "readability-actions-fix.js",
+        "delete-button-layout-fix.js",
+        "quote-reference-clean-fix.js",
+        "app-final-cleanup-fix.js",
+        "logout-fix.js",
+        "app-settings-fix.js",
+        "supabase-accounting-sync-fix.js",
+        "button-polish-fix.js",
+        "button-polish-final-fix.js",
+        "button-table-card-fix.js",
+        "app-quality-cleanup-fix.js",
+        "accounting-records-clean-fix.js",
+        "app-professional-polish-fix.js"
+      ];
+
+      fetch("live.html?source=" + version)
+        .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
+        .then((html) => {
+          const fixScripts = fixes.map((src) => `<script src="${src}?v=${version}"><\/script>`).join("");
+          const bootStyle = `<style id="wesetBootStyle">html:not(.weset-ready) body{opacity:0;visibility:hidden}html.weset-ready body{opacity:1;transition:opacity .12s ease;visibility:visible}</style>`;
+          const readyScript = `<script>setTimeout(function(){document.documentElement.classList.add("weset-ready");var boot=document.getElementById("wesetBootStyle");if(boot)boot.remove();},80);<\/script>`;
+          html = html
+            .replace("</head>", `${bootStyle}</head>`)
+            .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
+            .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
+            .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
+            .replace("</body>", `${fixScripts}${readyScript}</body>`);
+          document.open();
+          document.write(html);
+          document.close();
+          if (location.hash !== hash) location.hash = hash;
+        })
+        .catch(() => {
+          document.body.innerHTML = "<p style='font-family: Arial, sans-serif; padding: 18px;'>Could not load WeSet. Please refresh.</p>";
+        });
+    </script>
+  </body>
 </html>
