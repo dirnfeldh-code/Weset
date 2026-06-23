@@ -8,7 +8,7 @@
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
     <script>
-      const version = "20260623-polish1";
+      const version = "20260623-polish2";
       const hash = location.hash || "#dashboard";
       const fixes = [
         "clear-local-data-fix.js",
@@ -83,11 +83,14 @@
         .then((response) => response.ok ? response.text() : Promise.reject(new Error("Live app not found")))
         .then((html) => {
           const fixScripts = fixes.map((src) => `<script src="${src}?v=${version}"><\/script>`).join("");
+          const bootStyle = `<style id="wesetBootStyle">html:not(.weset-ready) body{opacity:0;visibility:hidden}html.weset-ready body{opacity:1;transition:opacity .12s ease;visibility:visible}</style>`;
+          const readyScript = `<script>setTimeout(function(){document.documentElement.classList.add("weset-ready");var boot=document.getElementById("wesetBootStyle");if(boot)boot.remove();},80);<\/script>`;
           html = html
+            .replace("</head>", `${bootStyle}</head>`)
             .replace(/href="styles\.css(?:\?[^\"]*)?"/, `href="styles.css?v=${version}"`)
             .replace(/src="app\.js(?:\?[^\"]*)?"/, `src="app.js?v=${version}"`)
             .replace(/src="supabase-bridge\.js(?:\?[^\"]*)?"/, `src="supabase-bridge.js?v=${version}"`)
-            .replace("</body>", `${fixScripts}</body>`);
+            .replace("</body>", `${fixScripts}${readyScript}</body>`);
           document.open();
           document.write(html);
           document.close();
