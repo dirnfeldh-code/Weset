@@ -18,7 +18,7 @@
       return "Supabase is rate-limiting this action. Wait a little, or set the password manually in Supabase Authentication > Users.";
     }
     if (text.includes("failed to fetch") || text.includes("network")) {
-      return "The app could not reach Supabase. Check your internet connection and Supabase project status.";
+      return "This browser could not reach the WeSet Supabase database. Supabase is online from this computer, so check this browser's internet/VPN/firewall, refresh the page, then press Check Supabase.";
     }
     return `Supabase could not sign in: ${error?.message || "Check the email, password, and confirmation status."}`;
   }
