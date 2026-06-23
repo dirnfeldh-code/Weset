@@ -99,5 +99,4 @@
   if (document.body) observer.observe(document.body, { childList: true, subtree: true });
   setTimeout(run, 250);
   setTimeout(run, 1200);
-  setInterval(run, 4000);
 })();
