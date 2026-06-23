@@ -8,7 +8,7 @@
   <body>
     <p style="font-family: Arial, sans-serif; padding: 18px;">Loading WeSet...</p>
     <script>
-      const version = "20260623-supabase1";
+      const version = "20260623-records1";
       const hash = location.hash || "#dashboard";
       const fixes = [
         "clear-local-data-fix.js",
@@ -74,7 +74,8 @@
         "button-polish-fix.js",
         "button-polish-final-fix.js",
         "button-table-card-fix.js",
-        "app-quality-cleanup-fix.js"
+        "app-quality-cleanup-fix.js",
+        "accounting-records-clean-fix.js"
       ];
 
       fetch("live.html?source=" + version)
