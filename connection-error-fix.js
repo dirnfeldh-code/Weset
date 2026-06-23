@@ -36,7 +36,7 @@
   function userActionFor(message) {
     const text = String(message || "").toLowerCase();
     if (text.includes("jwt expired") || text.includes("login expired") || text.includes("refresh")) return "Please log out, refresh the page, and sign in again.";
-    if (text.includes("failed to fetch") || text.includes("network") || text.includes("connection")) return "Please check your internet connection, then try again.";
+    if (text.includes("failed to fetch") || text.includes("network") || text.includes("connection")) return "This browser could not reach Supabase. Refresh the page, check VPN/firewall/ad-blocking, then use Check Supabase on the sign-in screen.";
     if (text.includes("row-level security") || text.includes("policy") || text.includes("permission")) return "Please check the Supabase table RLS policy for this action.";
     if (text.includes("edge function") || text.includes("email") || text.includes("resend")) return "Please check the Supabase Edge Function logs and Resend settings.";
     return "Please try again. If it repeats, send this message to Codex.";
