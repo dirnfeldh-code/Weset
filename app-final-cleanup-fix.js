@@ -219,5 +219,4 @@
   if (document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-status", "data-record-invoice-payment", "data-mark-invoice-paid", "data-send-in-app", "data-invoice-quote"] });
   setTimeout(runCleanup, 250);
   setTimeout(runCleanup, 1200);
-  setInterval(runCleanup, 3500);
 })();
