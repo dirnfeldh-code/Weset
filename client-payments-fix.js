@@ -68,6 +68,14 @@
     }));
   }
 
+  function displayInvoiceNumber(invoice) {
+    const current = invoice.invoiceNumber || invoice.invoice_number || invoice.id || "";
+    const quoteId = invoice.quoteId || invoice.quote_id || "";
+    const looksRaw = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(current || "")) || /^INV-[0-9a-f-]{20,}$/i.test(String(current || ""));
+    if (looksRaw && quoteId && typeof window.wesetInvoiceReferenceForQuote === "function") return window.wesetInvoiceReferenceForQuote(quoteId);
+    return current || "Invoice";
+  }
+
   function saveInvoiceRows(invoices) {
     writeJson(invoiceStoreKey, invoices);
   }
@@ -204,7 +212,7 @@
     const invoices = invoiceRows().filter((invoice) => !clientId || invoice.clientId === clientId);
     select.innerHTML = `<option value="">No invoice / general payment</option>` + invoices.map((invoice) => {
       const balance = invoiceBalance(invoice);
-      const label = `${invoice.invoiceNumber} - ${moneyText(balance)} outstanding`;
+      const label = `${displayInvoiceNumber(invoice)} - ${moneyText(balance)} outstanding`;
       return `<option value="${escapeHtml(invoice.invoiceNumber)}" data-client="${escapeHtml(invoice.clientId)}" data-balance="${Number(balance || 0)}">${escapeHtml(label)}</option>`;
     }).join("");
     if ([...select.options].some((option) => option.value === current)) select.value = current;
@@ -224,6 +232,7 @@
     const invoice = invoiceRows().find((entry) => entry.invoiceNumber === invoiceNumber);
     if (!invoice) return;
     ensurePanel();
+    document.querySelector("[data-accounting-section='actions']")?.click();
     renderPaymentClientOptions();
     document.querySelector("#clientPaymentClient").value = invoice.clientId || "";
     renderPaymentInvoiceOptions();
@@ -300,7 +309,8 @@
     if (!tbody) return;
     tbody.innerHTML = payments().sort((a, b) => String(b.date).localeCompare(String(a.date))).map((payment) => {
       const client = clientById(payment.clientId);
-      return `<tr><td>${dateText(payment.date)}</td><td>${escapeHtml(client.company || client.contact || "Client")}</td><td>${escapeHtml(payment.invoiceNumber || "General")}</td><td>${escapeHtml(payment.method)}</td><td>${escapeHtml(payment.reference || payment.notes || "")}</td><td><strong>${moneyText(payment.amount)}</strong></td><td><div class="payment-row-actions"><button class="ghost danger" data-delete-client-payment="${escapeHtml(payment.id)}" type="button">Delete</button></div></td></tr>`;
+      const invoice = invoiceRows().find((entry) => entry.invoiceNumber === payment.invoiceNumber);
+      return `<tr><td>${dateText(payment.date)}</td><td>${escapeHtml(client.company || client.contact || "Client")}</td><td>${escapeHtml(invoice ? displayInvoiceNumber(invoice) : payment.invoiceNumber || "General")}</td><td>${escapeHtml(payment.method)}</td><td>${escapeHtml(payment.reference || payment.notes || "")}</td><td><strong>${moneyText(payment.amount)}</strong></td><td><div class="payment-row-actions"><button class="ghost danger" data-delete-client-payment="${escapeHtml(payment.id)}" type="button">Delete</button></div></td></tr>`;
     }).join("") || `<tr><td colspan="7"><div class="empty">No client payments recorded yet.</div></td></tr>`;
   }
 
