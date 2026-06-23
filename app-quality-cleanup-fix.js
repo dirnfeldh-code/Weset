@@ -236,7 +236,6 @@
     };
   })();
 
-  document.addEventListener("click", () => setTimeout(cleanup, 120), true);
   document.addEventListener("input", schedule, true);
   window.addEventListener("hashchange", () => setTimeout(cleanup, 160));
   if (document.body) new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
