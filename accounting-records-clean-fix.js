@@ -333,7 +333,10 @@
     };
   }
 
-  document.addEventListener("click", () => setTimeout(refresh, 120), true);
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-send-stored-invoice], [data-record-invoice-payment], [data-view-live-invoice], .accounting-inline-expand-btn")) return;
+    setTimeout(refresh, 120);
+  }, true);
   document.addEventListener("submit", () => setTimeout(refresh, 250), true);
   document.addEventListener("change", () => setTimeout(refresh, 120), true);
   window.addEventListener("hashchange", () => setTimeout(refresh, 250));
