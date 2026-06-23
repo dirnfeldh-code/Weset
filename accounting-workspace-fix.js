@@ -27,8 +27,8 @@
       .accounting-create-invoice-panel .form-grid { align-items: end; }
       .accounting-create-invoice-panel .meta { margin-top: 8px; }
       .accounting-workspace-empty { background: #fff; border: 1px dashed var(--line,#d9e0e1); border-radius: 8px; color: var(--muted,#687478); padding: 18px; text-align: center; }
-      #accountingRecordsSection #clientPaymentForm, #accountingRecordsSection #expenseForm { display: none !important; }
-      #accountingActionsSection #clientPaymentsTable, #accountingActionsSection #clientPaymentSummary { display: none !important; }
+      #accountingRecordsSection #expenseForm { display: none !important; }
+      #accountingActionsSection #clientPaymentsPanel .report-table-wrap { margin-top: 12px; }
       @media (max-width: 760px) { .accounting-workspace-note { margin-left: 0; width: 100%; } .accounting-workspace-section { grid-template-columns: 1fr; } }
     `;
     document.head.appendChild(style);
@@ -163,15 +163,13 @@
     populateInvoiceQuoteSelect();
 
     appendUnique(actions, panelFor("#expenseForm"));
-    appendUnique(actions, panelFor("#clientPaymentForm"));
+    appendUnique(actions, document.querySelector("#clientPaymentsPanel") || panelFor("#clientPaymentForm"));
     appendUnique(actions, document.querySelector("#expenseCategoryManager"));
 
     splitReportPanel(records, reports);
 
     appendUnique(records, panelFor("#salesTable"));
     appendUnique(records, panelFor("#expensesTable"));
-    appendUnique(records, document.querySelector("#clientPaymentsPanel"));
-
     appendUnique(reports, panelFor("#accountsSummary"));
     appendUnique(reports, panelFor("#expenseBreakdown"));
     appendUnique(reports, panelFor("#monthlyAccounts"));
@@ -203,7 +201,10 @@
     scheduleOrganize();
   };
 
-  document.addEventListener("click", () => scheduleOrganize(150), true);
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("#accountingView [data-accounting-section], #accountingView #accountingCreateInvoiceBtn, #accountingView [data-record-invoice-payment], #accountingView [data-delete-client-payment], #accountingView [data-delete-expense], #accountingView [data-edit-expense], #accountingView [data-delete-vat-payment], #accountingView [data-delete-category], #accountingView .accounting-inline-expand-btn")) return;
+    scheduleOrganize(150);
+  }, true);
   document.addEventListener("submit", () => scheduleOrganize(350), true);
   document.addEventListener("change", (event) => {
     if (event.target?.matches?.("#accountingInvoiceQuoteSelect, #reportFromDate, #reportToDate, #reportCategoryFilter")) return;
