@@ -172,7 +172,7 @@
 
   async function optionalTableRequest(path, table, fallback = []) {
     try {
-      return await sbRequest(path);
+      return await sbRequest(path, { silent: true });
     } catch (error) {
       if (!missingTable(error, table)) throw error;
       missingOptionalTables.add(table);
