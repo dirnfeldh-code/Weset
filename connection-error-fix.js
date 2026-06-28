@@ -71,7 +71,7 @@
       try {
         return await oldSbRequest(path, options);
       } catch (error) {
-        showConnectionError("Supabase connection problem", error, `Request: ${path}`);
+        if (!options.silent) showConnectionError("Supabase connection problem", error, `Request: ${path}`);
         throw error;
       }
     };
@@ -82,7 +82,8 @@
     try {
       const response = await originalFetch(input, init);
       const url = typeof input === "string" ? input : input?.url || "";
-      if (!response.ok && (url.includes("supabase.co") || url.includes("postcodes.io"))) {
+      const silent = Boolean(init?.wesetSilentError);
+      if (!silent && !response.ok && (url.includes("supabase.co") || url.includes("postcodes.io"))) {
         const clone = response.clone();
         const data = await clone.json().catch(() => ({}));
         const message = data.error_description || data.message || data.msg || `${response.status} ${response.statusText}`;
@@ -91,8 +92,9 @@
       return response;
     } catch (error) {
       const url = typeof input === "string" ? input : input?.url || "";
-      if (url.includes("supabase.co") || url.includes("postcodes.io")) showConnectionError("Connection problem", error);
+      if (!init?.wesetSilentError && (url.includes("supabase.co") || url.includes("postcodes.io"))) showConnectionError("Connection problem", error);
       throw error;
     }
   };
 })();
+
