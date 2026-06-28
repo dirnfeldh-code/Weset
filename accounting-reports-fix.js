@@ -171,12 +171,37 @@
     });
   }
 
+  function quoteDate(quote) {
+    return quote.acceptedAt || quote.accepted_at || quote.updatedAt || quote.updated_at || quote.requiredDate || quote.required_date || quote.createdAt || quote.created_at || "";
+  }
+
+  function quoteFinancials(quote) {
+    if (typeof window.wesetQuoteTotals === "function") return window.wesetQuoteTotals(quote);
+    const costs = typeof quoteCosts === "function" ? quoteCosts(quote) : { total: 0 };
+    const subtotal = Number(costs.total || 0);
+    return { subtotal, vatAmount: 0, total: subtotal };
+  }
+
+  function acceptedQuoteSales(filters, allInvoices) {
+    if (filters.category && !["all", "Sales", "VAT"].includes(filters.category)) return [];
+    const invoicedQuoteIds = new Set(allInvoices
+      .filter((invoice) => invoice.status !== "Cancelled")
+      .map((invoice) => String(invoice.quoteId || ""))
+      .filter(Boolean));
+    return (state.quotes || [])
+      .filter((quote) => quote.status === "Accepted")
+      .filter((quote) => !invoicedQuoteIds.has(String(quote.id || "")))
+      .filter((quote) => inPeriod(quoteDate(quote), filters))
+      .map((quote) => ({ quote, ...quoteFinancials(quote) }));
+  }
+
   function reportTotals(filters = currentFilters()) {
     const invoices = filteredInvoices(filters).filter((invoice) => invoice.status !== "Cancelled");
+    const acceptedQuotes = acceptedQuoteSales(filters, reportState.invoices);
     const expenses = filteredExpenses(filters);
-    const salesSubtotal = invoices.reduce((sum, invoice) => sum + Number(invoice.subtotal || 0), 0);
-    const salesVat = invoices.reduce((sum, invoice) => sum + Number(invoice.vatAmount || 0), 0);
-    const salesTotal = invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const salesSubtotal = invoices.reduce((sum, invoice) => sum + Number(invoice.subtotal || 0), 0) + acceptedQuotes.reduce((sum, entry) => sum + Number(entry.subtotal || 0), 0);
+    const salesVat = invoices.reduce((sum, invoice) => sum + Number(invoice.vatAmount || 0), 0) + acceptedQuotes.reduce((sum, entry) => sum + Number(entry.vatAmount || 0), 0);
+    const salesTotal = invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0) + acceptedQuotes.reduce((sum, entry) => sum + Number(entry.total || 0), 0);
     const expenseGross = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
     const expenseVat = expenses.reduce((sum, expense) => sum + expenseVatAmount(expense), 0);
     const expenseNet = expenseGross - expenseVat;
@@ -186,7 +211,7 @@
     const accountsReceivable = unpaidInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     const paidInvoices = invoices.filter((invoice) => invoice.status === "Paid").reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     const netProfit = salesSubtotal - expenseNet;
-    return { invoices, expenses, salesSubtotal, salesVat, salesTotal, expenseGross, expenseVat, expenseNet, paidVat, netVatDue, accountsReceivable, paidInvoices, netProfit };
+    return { invoices, acceptedQuotes, expenses, salesSubtotal, salesVat, salesTotal, expenseGross, expenseVat, expenseNet, paidVat, netVatDue, accountsReceivable, paidInvoices, netProfit };
   }
 
   function ensureStyles() {
@@ -273,7 +298,7 @@
     const summary = document.querySelector("#accountingReportSummary");
     if (!summary) return;
     summary.innerHTML = [
-      ["Invoice sales", totals.salesSubtotal],
+      ["Recognised sales", totals.salesSubtotal],
       ["VAT collected", totals.salesVat],
       ["VAT on expenses", totals.expenseVat],
       ["Expenses net", totals.expenseNet],
@@ -324,7 +349,7 @@
     const node = document.querySelector("#liveVatReport");
     if (!node) return;
     node.innerHTML = [
-      ["Output VAT on invoices", totals.salesVat],
+      ["Output VAT on invoices and accepted quotes", totals.salesVat],
       ["Input VAT on VAT-marked expenses", -totals.expenseVat],
       ["VAT payments / adjustments", -totals.paidVat],
       [totals.netVatDue < 0 ? "VAT credit" : "VAT to pay", totals.netVatDue, "is-total"]
@@ -337,7 +362,7 @@
     note.classList.toggle("is-warn", Boolean(reportState.error));
     note.textContent = reportState.error
       ? `Using app invoices only. Supabase could not load invoices: ${reportState.error}`
-      : `Using ${reportState.source === "Supabase" ? "Supabase and app" : "app"} invoice records. Refresh after sending a new invoice.`;
+      : `Using ${reportState.source === "Supabase" ? "Supabase and app" : "app"} invoices plus accepted quotes. Invoiced quotes are counted only once.`;
   }
 
   function renderReportsOnly() {
@@ -418,7 +443,7 @@
       downloadCsv(`weset-balance-sheet-${stamp}.csv`, [["Line", "Amount"], ["Cash from paid invoices", numberText(totals.paidInvoices)], ["Accounts receivable", numberText(totals.accountsReceivable)], ["VAT reclaimable / credit", numberText(vatAsset)], ["VAT payable", numberText(vatLiability)], ["Simple equity position", numberText(totals.paidInvoices + totals.accountsReceivable + vatAsset - vatLiability)]]);
       return;
     }
-    downloadCsv(`weset-vat-report-${stamp}.csv`, [["Line", "Amount"], ["Output VAT on invoices", numberText(totals.salesVat)], ["Input VAT on expenses", numberText(totals.expenseVat)], ["VAT payments / adjustments", numberText(totals.paidVat)], ["VAT due / credit", numberText(totals.netVatDue)]]);
+    downloadCsv(`weset-vat-report-${stamp}.csv`, [["Line", "Amount"], ["Output VAT on invoices and accepted quotes", numberText(totals.salesVat)], ["Input VAT on expenses", numberText(totals.expenseVat)], ["VAT payments / adjustments", numberText(totals.paidVat)], ["VAT due / credit", numberText(totals.netVatDue)]]);
   }
 
   function install() {
@@ -441,3 +466,4 @@
   window.wesetRefreshAccountingReports = loadInvoices;
   install();
 })();
+
