@@ -150,6 +150,27 @@
     });
   }
 
+  function cleanupPendingQuoteActions() {
+    document.querySelectorAll("#pendingQuotes .quote-card").forEach((card) => {
+      card.querySelector(".quote-record-actions")?.remove();
+      card.querySelectorAll("button").forEach((button) => {
+        const status = String(button.dataset.status || "").split(":").pop()?.toLowerCase() || "";
+        if (status === "accepted") {
+          button.textContent = "Accept";
+          button.classList.add("primary");
+          return;
+        }
+        if (status === "declined") {
+          button.textContent = "Decline";
+          button.classList.add("secondary");
+          return;
+        }
+        button.remove();
+      });
+      card.querySelectorAll(".stage-note, .clean-action-note, .quote-action-panel").forEach((node) => node.remove());
+    });
+  }
+
   function cleanupUserActions() {
     document.querySelectorAll('[data-delete-user="owner"], [data-delete-user="info@weset.co.uk"]').forEach((button) => button.remove());
     document.querySelectorAll("#usersTable [data-delete-user]").forEach((button) => {
@@ -195,6 +216,7 @@
     cleanupLoginOverlay();
     cleanupInvoiceActions();
     cleanupQuoteActions();
+    cleanupPendingQuoteActions();
     cleanupUserActions();
     cleanupItemActions();
     cleanupAccountingActions();
