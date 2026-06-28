@@ -30,7 +30,7 @@
   }
 
   function sessionHasLogin(session) {
-    return Boolean(session?.accessToken || session?.refreshToken || session?.email);
+    return Boolean(session?.accessToken && session?.refreshToken);
   }
 
   function ensureSessionUser() {
@@ -123,3 +123,4 @@
     if (typeof render === "function") render();
   }, 250);
 })();
+
