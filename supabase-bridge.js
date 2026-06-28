@@ -71,6 +71,7 @@ async function sbLogin(event) {
       name: user.name,
       accessToken: auth.access_token,
       refreshToken: auth.refresh_token,
+      securityRelease: window.wesetSecurityRelease || "20260628-securelogin2",
       loggedInAt: new Date().toISOString()
     }));
     await sbLoadAll();
@@ -605,3 +606,4 @@ function sbShowError(error) {
 
 sbReplaceHandlers();
 sbLoadAll().then(render).catch((error) => console.warn(error));
+
