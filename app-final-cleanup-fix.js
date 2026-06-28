@@ -202,6 +202,21 @@
     if (typeof window.wesetCleanQuoteReferences === "function") window.wesetCleanQuoteReferences();
   }
 
+  const cleanupObserverOptions = { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-status", "data-record-invoice-payment", "data-mark-invoice-paid", "data-send-in-app", "data-invoice-quote"] };
+  let cleanupObserver = null;
+  let cleanupRunning = false;
+  function runCleanupNow() {
+    if (cleanupRunning) return;
+    cleanupRunning = true;
+    cleanupObserver?.disconnect();
+    try {
+      runCleanup();
+    } finally {
+      cleanupRunning = false;
+      if (document.body && cleanupObserver) cleanupObserver.observe(document.body, cleanupObserverOptions);
+    }
+  }
+
   const schedule = (() => {
     let timer;
     return () => {
@@ -215,8 +230,9 @@
   window.addEventListener("hashchange", () => setTimeout(runCleanup, 250));
   window.addEventListener("storage", schedule);
 
-  const observer = new MutationObserver(schedule);
-  if (document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-status", "data-record-invoice-payment", "data-mark-invoice-paid", "data-send-in-app", "data-invoice-quote"] });
-  setTimeout(runCleanup, 250);
-  setTimeout(runCleanup, 1200);
+  cleanupObserver = new MutationObserver(runCleanupNow);
+  if (document.body) cleanupObserver.observe(document.body, cleanupObserverOptions);
+  runCleanupNow();
+  setTimeout(runCleanupNow, 1200);
 })();
+
