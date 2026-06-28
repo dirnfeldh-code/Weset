@@ -16,7 +16,7 @@
   function hasSavedLogin() {
     try {
       const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || "{}");
-      return Boolean(saved?.accessToken || saved?.refreshToken || saved?.email || saved?.id);
+      return Boolean(saved?.accessToken && saved?.refreshToken);
     } catch {
       return false;
     }
@@ -108,3 +108,4 @@
   setTimeout(syncAuthView, 100);
   setTimeout(syncAuthView, 800);
 })();
+
