@@ -1,7 +1,9 @@
 (() => {
   const SESSION_KEY = typeof sessionKey !== "undefined" ? sessionKey : "we-set-session";
+  const SECURITY_RELEASE = "20260628-securelogin2";
   let verificationPromise = null;
   let verifiedToken = "";
+  window.wesetSecurityRelease = SECURITY_RELEASE;
 
   function readSession() {
     try {
@@ -12,7 +14,11 @@
   }
 
   function hasSupabaseCredentials(session = readSession()) {
-    return Boolean(session.accessToken && session.refreshToken);
+    return Boolean(
+      session.accessToken &&
+      session.refreshToken &&
+      session.securityRelease === SECURITY_RELEASE
+    );
   }
 
   function installStyles() {
@@ -150,5 +156,28 @@
 
   window.wesetVerifySupabaseSession = () => verifySession(true);
   setTimeout(() => verifySession(), 0);
+
+  async function securityHeartbeat() {
+    if (!hasSupabaseCredentials()) {
+      lockApp("Your previous login is no longer valid. Please sign in again.", true);
+      return;
+    }
+    if (typeof window.wesetRefreshSupabaseSession === "function") {
+      const refreshed = await window.wesetRefreshSupabaseSession();
+      if (!refreshed) {
+        lockApp("Your Supabase session has ended. Please sign in again.", true);
+        return;
+      }
+    }
+    await verifySession(true);
+  }
+
+  window.addEventListener("storage", (event) => {
+    if (event.key === SESSION_KEY && !hasSupabaseCredentials()) lockApp(undefined, false);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) securityHeartbeat();
+  });
+  setInterval(securityHeartbeat, 60000);
 })();
 
