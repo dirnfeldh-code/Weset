@@ -99,6 +99,15 @@ alter table public.expense_categories enable row level security;
 alter table public.expense_vat_records enable row level security;
 alter table public.vat_payments enable row level security;
 
+grant select, insert, update, delete on table
+  public.app_settings,
+  public.invoices,
+  public.client_payments,
+  public.expense_categories,
+  public.expense_vat_records,
+  public.vat_payments
+to authenticated;
+
 do $$
 declare
   target_table text;
@@ -149,3 +158,4 @@ values
 on conflict (name) do nothing;
 
 notify pgrst, 'reload schema';
+
