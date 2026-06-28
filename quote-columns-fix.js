@@ -154,13 +154,15 @@
     const quote = (state.quotes || []).find((entry) => entry.id === id);
     if (!quote || quote.status === status) return;
     quote.status = status;
-    renderColumns();
+    if (typeof renderQuotes === "function" && renderQuotes !== renderColumns) renderQuotes();
+    else renderColumns();
     try {
       if (typeof updateQuote === "function") await updateQuote(id, { status });
     } catch (error) {
       alert(`Could not update quote status: ${error.message || "Please try again."}`);
     } finally {
-      renderColumns();
+      if (typeof renderQuotes === "function" && renderQuotes !== renderColumns) renderQuotes();
+      else renderColumns();
       if (typeof renderDashboard === "function") renderDashboard();
       if (typeof saveState === "function") saveState();
     }
@@ -181,3 +183,4 @@
   if (typeof renderQuotes === "function") renderQuotes = renderColumns;
   renderColumns();
 })();
+
