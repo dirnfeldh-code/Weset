@@ -56,6 +56,7 @@
           name: auth.user?.user_metadata?.name || email,
           accessToken: auth.access_token,
           refreshToken: auth.refresh_token,
+          securityRelease: window.wesetSecurityRelease || "20260628-securelogin2",
           loggedInAt: new Date().toISOString()
         };
         localStorage.setItem(sessionKey, JSON.stringify(user));
@@ -82,3 +83,4 @@
 
   addLoginFix();
 })();
+
