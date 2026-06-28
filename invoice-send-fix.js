@@ -43,9 +43,18 @@
       padding: 10px !important;
     }
     .quote-action-panel {
-      display: grid;
-      gap: 10px;
+      display: grid !important;
+      gap: 8px !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       width: 100%;
+    }
+    .quote-action-panel > button {
+      box-sizing: border-box !important;
+      font-size: 12.5px !important;
+      line-height: 1.15 !important;
+      min-height: 36px !important;
+      padding: 7px 9px !important;
+      width: 100% !important;
     }
     .quote-action-group {
       align-items: stretch;
@@ -112,13 +121,8 @@
       font-weight: 700;
       opacity: 0.8;
     }
-    @media (min-width: 760px) {
-      .quote-action-panel {
-        grid-template-columns: 1.2fr 1fr;
-      }
-      .quote-action-group.is-tools {
-        grid-column: 1 / -1;
-      }
+    @media (min-width: 1180px) {
+      .quote-action-panel { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
     }
     @media (max-width: 620px) {
       .quote-action-row,
@@ -365,19 +369,15 @@
 
   function organizeQuoteActions() {
     document.querySelectorAll(".quote-record-actions").forEach((actions) => {
-      const sendQuote = actions.querySelector("[data-send-in-app]");
-      const prepareEmail = actions.querySelector("[data-send-quote]");
-      const createInvoiceButton = actions.querySelector("[data-invoice-quote]");
-      const sendInvoiceButton = actions.querySelector("[data-send-invoice]");
+      const sendQuote = actions.querySelector("[data-stage-send-quote], [data-send-in-app]");
+      const createInvoiceButton = actions.querySelector("[data-stage-invoice-quote], [data-invoice-quote]");
       const editButton = actions.querySelector("[data-edit-quote]");
       const deleteButton = actions.querySelector("[data-delete-quote]");
-      if (!sendQuote && !prepareEmail && !createInvoiceButton && !sendInvoiceButton && !editButton && !deleteButton) return;
+      if (!sendQuote && !createInvoiceButton && !editButton && !deleteButton) return;
 
       const panel = document.createElement("div");
       panel.className = "quote-action-panel";
-      if (sendQuote || prepareEmail) panel.appendChild(makeActionGroup("Quote email", "is-primary", [sendQuote, prepareEmail]));
-      if (createInvoiceButton || sendInvoiceButton) panel.appendChild(makeActionGroup("Invoice", "is-primary", [createInvoiceButton, sendInvoiceButton]));
-      if (editButton || deleteButton) panel.appendChild(makeActionGroup("Manage", "is-tools", [editButton, deleteButton]));
+      [sendQuote, createInvoiceButton, editButton, deleteButton].filter(Boolean).forEach((button) => panel.appendChild(button));
       actions.replaceChildren(panel);
     });
   }
@@ -443,3 +443,4 @@
 
   refreshQuoteUi();
 })();
+
