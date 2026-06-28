@@ -25,6 +25,7 @@
   let syncing = false;
   let remoteLoaded = false;
   let lastMessage = "";
+  const missingOptionalTables = new Set();
 
   function readJson(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
@@ -164,6 +165,21 @@
     return [...map.values()];
   }
 
+  function missingTable(error, table) {
+    const text = String(error?.message || error || "").toLowerCase();
+    return text.includes(`public.${table}`) || (text.includes("schema cache") && text.includes(table));
+  }
+
+  async function optionalTableRequest(path, table, fallback = []) {
+    try {
+      return await sbRequest(path);
+    } catch (error) {
+      if (!missingTable(error, table)) throw error;
+      missingOptionalTables.add(table);
+      return fallback;
+    }
+  }
+
   async function upsertByQuery(table, query, body) {
     const existing = await sbRequest(`${table}?${query}&select=*`);
     if (existing?.length) return sbRequest(`${table}?${query}`, { method: "PATCH", body });
@@ -175,13 +191,14 @@
       notify("Accounting sync is waiting for Supabase sign-in. Local records still show on this device.", true);
       return;
     }
+    missingOptionalTables.clear();
     try {
       const [settings, invoices, payments, categories, expenseVatRows, vatPayments] = await Promise.all([
         sbRequest("app_settings?key=eq.company_profile&select=value"),
         sbRequest("invoices?select=*&order=created_at.desc"),
         sbRequest("client_payments?select=*&order=payment_date.desc"),
         sbRequest("expense_categories?select=name&order=name.asc"),
-        sbRequest("expense_vat_records?select=*&order=updated_at.desc"),
+        optionalTableRequest("expense_vat_records?select=*&order=updated_at.desc", "expense_vat_records"),
         sbRequest("vat_payments?select=*&order=payment_date.desc")
       ]);
 
@@ -217,7 +234,9 @@
       })));
 
       remoteLoaded = true;
-      notify("Accounting sync connected to Supabase.");
+      notify(missingOptionalTables.has("expense_vat_records")
+        ? "Accounting is connected. Expense VAT choices remain on this device until the expense_vat_records table is created in Supabase."
+        : "Accounting sync connected to Supabase.", missingOptionalTables.size > 0);
       if (typeof renderAccounting === "function") setTimeout(renderAccounting, 80);
     } catch (error) {
       notify(`Accounting sync needs Supabase tables: ${error.message || "run the accounting SQL script."}`, true);
@@ -269,13 +288,21 @@
 
   async function syncExpenseVat() {
     const records = readJson(keys.expenseVat, {});
-    for (const [expenseId, record] of Object.entries(records)) {
-      if (!uuidPattern.test(String(expenseId))) continue;
-      await upsertByQuery("expense_vat_records", `expense_id=eq.${encodeURIComponent(expenseId)}`, {
-        expense_id: expenseId,
-        enabled: Boolean(record?.enabled),
-        rate: Number(record?.rate || 20)
-      });
+    try {
+      for (const [expenseId, record] of Object.entries(records)) {
+        if (!uuidPattern.test(String(expenseId))) continue;
+        await upsertByQuery("expense_vat_records", `expense_id=eq.${encodeURIComponent(expenseId)}`, {
+          expense_id: expenseId,
+          enabled: Boolean(record?.enabled),
+          rate: Number(record?.rate || 20),
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      if (missingTable(error, "expense_vat_records")) {
+        throw new Error("The Supabase expense_vat_records table is missing. Run the WeSet expense VAT SQL in Supabase SQL Editor.");
+      }
+      throw error;
     }
   }
 
@@ -365,3 +392,4 @@
   refreshUi();
   setTimeout(loadRemote, 1000);
 })();
+
