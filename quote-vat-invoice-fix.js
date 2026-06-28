@@ -275,7 +275,7 @@
     const client = typeof getClient === "function" ? getClient(quote.clientId) : {};
     const totals = calcTotals(quote);
     const items = typeof quoteItems === "function" ? quoteItems(quote) : (quote.items || []);
-    const statusButtons = ["Sent", "Accepted", "Declined"].map((status) => `<button class="ghost status-move-button ${quote.status === status ? "is-current" : ""}" data-status="${escapeHtml(quote.id)}:${status}" type="button">${quote.status === status ? status : `Mark ${status.toLowerCase()}`}</button>`).join("");
+    const statusButtons = ["Accepted", "Declined"].map((status) => `<button class="ghost status-move-button ${quote.status === status ? "is-current" : ""}" data-status="${escapeHtml(quote.id)}:${status}" type="button">${quote.status === status ? status : status === "Accepted" ? "Mark accepted" : "Decline"}</button>`).join("");
     return `<article class="quote-card" data-quote-card="${escapeHtml(quote.id)}">
       <div class="card-top">
         <div><h3>${escapeHtml(clientTitle(client))}</h3><p class="meta">Quote ${escapeHtml(quoteRef(quote))} | ${quote.workstations} workstations, ${quote.rooms} rooms<br>${escapeHtml(quote.premises)}</p></div>
@@ -289,11 +289,10 @@
       </div>
       <p class="meta">Required ${dateText(quote.requiredDate)}</p>
       <div class="quote-record-actions">
-        <button class="primary send-in-app-button" data-send-in-app="${escapeHtml(quote.id)}" type="button">Send from app</button>
-        <button class="secondary" data-invoice-quote="${escapeHtml(quote.id)}" type="button">Create invoice</button>
-        <button class="secondary" data-edit-quote="${escapeHtml(quote.id)}" type="button">Edit</button>
+        <button class="primary send-in-app-button" data-stage-send-quote="${escapeHtml(quote.id)}" type="button">Send quote</button>
+        <button class="secondary" data-stage-invoice-quote="${escapeHtml(quote.id)}" type="button">Create invoice</button>
+        <button class="secondary" data-edit-quote="${escapeHtml(quote.id)}" type="button">Edit quote</button>
         <button class="ghost danger" data-delete-quote="${escapeHtml(quote.id)}" type="button">Delete</button>
-        <button class="secondary" data-send-quote="${escapeHtml(quote.id)}" type="button">Prepare email</button>
       </div>
       <div class="quote-status-actions">${statusButtons}</div>
     </article>`;
@@ -376,3 +375,4 @@
   updateVatSummary();
   renderColumns();
 })();
+
