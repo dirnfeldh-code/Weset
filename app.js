@@ -1,7 +1,7 @@
 const storageKey = "we-set-office-console";
 const sessionKey = "we-set-session";
 const views = ["dashboard", "clients", "quotes", "items", "installations", "accounting", "users"];
-const admin = { id: "owner", email: "info@weset.co.uk", password: "weset123", name: "WeSet Admin", role: "Owner", permissions: views, active: true };
+const admin = { id: "owner", email: "info@weset.co.uk", password: "", name: "WeSet Admin", role: "Owner", permissions: views, active: true };
 const catalog = [
   ["desktop-pc", "Desktop computer", "IT equipment", 720, "each"],
   ["laptop", "Laptop", "IT equipment", 950, "each"],
@@ -159,3 +159,4 @@ function metric([label, value]) { return `<article class="metric"><span>${esc(la
 function cls(v) { return String(v || "").replaceAll(" ", "-"); }
 function empty(m) { return `<div class="empty">${esc(m)}</div>`; }
 function esc(v) { return String(v ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
+
