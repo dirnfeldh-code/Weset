@@ -38,7 +38,8 @@ async function sbRequest(path, options = {}) {
       "Content-Type": "application/json",
       Prefer: options.prefer || "return=representation"
     },
-    body: options.body ? JSON.stringify(options.body) : undefined
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    wesetSilentError: Boolean(options.silent)
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
