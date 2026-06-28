@@ -86,15 +86,40 @@
     });
   }
 
+  function quoteDate(quote) {
+    return String(quote.acceptedAt || quote.accepted_at || quote.updatedAt || quote.updated_at || quote.requiredDate || quote.required_date || quote.createdAt || quote.created_at || "").slice(0, 10);
+  }
+
+  function quoteFinancials(quote) {
+    if (typeof window.wesetQuoteTotals === "function") return window.wesetQuoteTotals(quote);
+    const costs = typeof quoteCosts === "function" ? quoteCosts(quote) : { total: 0 };
+    const subtotal = Number(costs.total || 0);
+    return { subtotal, vatAmount: 0, total: subtotal };
+  }
+
+  function acceptedQuoteSales(current, allInvoices) {
+    if (current.category && !["all", "Sales", "VAT"].includes(current.category)) return [];
+    const invoicedQuoteIds = new Set(allInvoices
+      .filter((invoice) => invoice.status !== "Cancelled")
+      .map((invoice) => String(invoice.quoteId || ""))
+      .filter(Boolean));
+    return (state.quotes || [])
+      .filter((quote) => quote.status === "Accepted")
+      .filter((quote) => !invoicedQuoteIds.has(String(quote.id || "")))
+      .filter((quote) => inPeriod(quoteDate(quote), current))
+      .map((quote) => ({ quote, ...quoteFinancials(quote) }));
+  }
+
   function vatPayments(current = filters()) {
     return readJson(vatPaymentStoreKey, []).filter((payment) => inPeriod(payment.date, current));
   }
 
   function totals(current = filters()) {
     const invoices = filteredInvoices(current);
+    const acceptedQuotes = acceptedQuoteSales(current, invoiceRows());
     const expenses = filteredExpenses(current);
-    const salesSubtotal = invoices.reduce((sum, invoice) => sum + Number(invoice.subtotal || 0), 0);
-    const salesVat = invoices.reduce((sum, invoice) => sum + Number(invoice.vatAmount || 0), 0);
+    const salesSubtotal = invoices.reduce((sum, invoice) => sum + Number(invoice.subtotal || 0), 0) + acceptedQuotes.reduce((sum, entry) => sum + Number(entry.subtotal || 0), 0);
+    const salesVat = invoices.reduce((sum, invoice) => sum + Number(invoice.vatAmount || 0), 0) + acceptedQuotes.reduce((sum, entry) => sum + Number(entry.vatAmount || 0), 0);
     const expenseNet = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
     const expenseVat = expenses.reduce((sum, expense) => sum + expenseVatAmount(expense), 0);
     const paidVat = vatPayments(current).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
@@ -102,7 +127,7 @@
     const paidInvoices = invoices.filter((invoice) => invoice.status === "Paid").reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     const accountsReceivable = invoices.filter((invoice) => !["Paid", "Cancelled"].includes(invoice.status)).reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     const netProfit = salesSubtotal - expenseNet;
-    return { invoices, expenses, salesSubtotal, salesVat, expenseNet, expenseVat, paidVat, netVatDue, paidInvoices, accountsReceivable, netProfit };
+    return { invoices, acceptedQuotes, expenses, salesSubtotal, salesVat, expenseNet, expenseVat, paidVat, netVatDue, paidInvoices, accountsReceivable, netProfit };
   }
 
   function updateExpenseVatPreview() {
@@ -142,7 +167,7 @@
     const all = totals(current);
     const summary = document.querySelector("#accountingReportSummary");
     if (summary) {
-      summary.innerHTML = [["Invoice sales", all.salesSubtotal], ["VAT collected", all.salesVat], ["VAT on expenses", all.expenseVat], ["Expenses net", all.expenseNet], ["Profit", all.netProfit, "is-total"], ["VAT still due", all.netVatDue, all.netVatDue > 0 ? "is-total" : ""]]
+      summary.innerHTML = [["Recognised sales", all.salesSubtotal], ["VAT collected", all.salesVat], ["VAT on expenses", all.expenseVat], ["Expenses net", all.expenseNet], ["Profit", all.netProfit, "is-total"], ["VAT still due", all.netVatDue, all.netVatDue > 0 ? "is-total" : ""]]
         .map(([label, value, className]) => `<article class="report-mini-card ${className || ""}"><span>${escapeHtml(label)}</span><strong>${moneyText(value)}</strong></article>`).join("");
     }
     const pl = document.querySelector("#profitLossReport");
@@ -161,7 +186,7 @@
     }
     const vat = document.querySelector("#liveVatReport");
     if (vat) {
-      vat.innerHTML = [["Output VAT on invoices", all.salesVat], ["Input VAT on VAT-marked expenses", -all.expenseVat], ["VAT payments / adjustments", -all.paidVat], [all.netVatDue < 0 ? "VAT credit" : "VAT to pay", all.netVatDue, "is-total"]]
+      vat.innerHTML = [["Output VAT on invoices and accepted quotes", all.salesVat], ["Input VAT on VAT-marked expenses", -all.expenseVat], ["VAT payments / adjustments", -all.paidVat], [all.netVatDue < 0 ? "VAT credit" : "VAT to pay", all.netVatDue, "is-total"]]
         .map(([label, value, className]) => `<div class="report-line ${className || ""}"><span>${escapeHtml(label)}</span><strong>${moneyText(value)}</strong></div>`).join("");
     }
   }
@@ -192,7 +217,7 @@
       const vatAsset = Math.max(0, -all.netVatDue);
       return downloadCsv(`weset-balance-sheet-${stamp}.csv`, [["Line", "Amount"], ["Cash from paid invoices", numberText(all.paidInvoices)], ["Accounts receivable", numberText(all.accountsReceivable)], ["VAT reclaimable / credit", numberText(vatAsset)], ["VAT payable", numberText(vatLiability)], ["Simple equity position", numberText(all.paidInvoices + all.accountsReceivable + vatAsset - vatLiability)]]);
     }
-    if (type === "vat") return downloadCsv(`weset-vat-report-${stamp}.csv`, [["Line", "Amount"], ["Output VAT on invoices", numberText(all.salesVat)], ["Input VAT on expenses", numberText(all.expenseVat)], ["VAT payments / adjustments", numberText(all.paidVat)], ["VAT due / credit", numberText(all.netVatDue)]]);
+    if (type === "vat") return downloadCsv(`weset-vat-report-${stamp}.csv`, [["Line", "Amount"], ["Output VAT on invoices and accepted quotes", numberText(all.salesVat)], ["Input VAT on expenses", numberText(all.expenseVat)], ["VAT payments / adjustments", numberText(all.paidVat)], ["VAT due / credit", numberText(all.netVatDue)]]);
   }
 
   function refresh() {
@@ -227,3 +252,4 @@
   setInterval(refresh, 1500);
   refresh();
 })();
+
