@@ -53,21 +53,140 @@
   }
 
   function getClientSafe(quote) {
-    return typeof getClient === "function" ? getClient(quote.clientId) : { company: "Client", contact: "", email: "" };
+    return (state.clients || []).find((client) => client.id === quote?.clientId)
+      || (typeof getClient === "function" ? getClient(quote?.clientId) : null)
+      || { company: "Client", contact: "", email: "" };
+  }
+
+  function moneyText(value) {
+    return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
+  }
+
+  function companyDetails() {
+    if (typeof window.wesetGetCompanyDetails === "function") return window.wesetGetCompanyDetails();
+    return window.wesetCompanyDetails || { name: "WeSet", address1: "", address2: "", vat: "", email: "", phone: "", terms: "Net 15" };
+  }
+
+  function quoteDetails(kind, quote) {
+    const saved = typeof window.wesetGetQuoteDocumentDetails === "function"
+      ? window.wesetGetQuoteDocumentDetails(kind, quote)
+      : null;
+    let rows = Array.isArray(saved?.rows) ? saved.rows.filter((row) => row?.product || Number(row?.rate || 0)) : [];
+    if (!rows.length) {
+      rows = (Array.isArray(quote?.items) ? quote.items : []).map((item) => ({
+        product: item.name || "Item or service",
+        description: item.documentDescription || item.description || item.notes || quote.notes || quote.premises || "",
+        qty: Number(item.quantity || 1),
+        rate: Number(item.unitCost || 0),
+        vat: ""
+      }));
+    }
+
+    const vat = typeof window.wesetQuoteTotals === "function" ? window.wesetQuoteTotals(quote) : {};
+    const storedSubtotal = Number(quote?.supplyTotal || 0) + Number(quote?.servicesTotal || 0) || Number(quote?.storedTotal || 0);
+    if (!rows.length && storedSubtotal) {
+      rows = [{
+        product: "Quoted office setup",
+        description: quote.notes || `Office setup for ${quote.premises || "client site"}`,
+        qty: 1,
+        rate: storedSubtotal,
+        vat: ""
+      }];
+    }
+
+    const subtotal = rows.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.rate || 0), 0);
+    const vatEnabled = saved ? !/^includes vat @ 0%$/i.test(String(saved.vatLabel || "")) : Boolean(vat.vatEnabled);
+    const vatRate = Number(vat.vatRate || String(saved?.vatLabel || "").match(/[\d.]+/)?.[0] || 0);
+    const vatAmount = saved?.vatAmount != null ? Number(saved.vatAmount || 0) : (vatEnabled ? subtotal * vatRate / 100 : 0);
+    const reference = saved?.reference || (kind === "Invoice" ? `INV-${quoteRef(quote).replace(/^Q-?/i, "")}` : quoteRef(quote));
+    return {
+      reference,
+      issueDate: saved?.issueDate || new Date().toISOString().slice(0, 10),
+      dueDate: saved?.dueDate || quote.requiredDate || "",
+      billTo: saved?.billTo || "",
+      shipTo: saved?.shipTo || quote.premises || "",
+      rows,
+      subtotal,
+      vatRate,
+      vatAmount,
+      total: subtotal + vatAmount,
+      vatLabel: saved?.vatLabel || `VAT @ ${vatEnabled ? vatRate : 0}%`
+    };
+  }
+
+  function structuredText(kind, quote, details, client) {
+    const company = companyDetails();
+    const billTo = String(details.billTo || "").split("\n");
+    return [
+      `DOC_TYPE: ${kind}`,
+      `REFERENCE: ${details.reference}`,
+      `QUOTE_REF: ${quoteRef(quote)}`,
+      `DATE: ${details.issueDate}`,
+      `DUE_DATE: ${details.dueDate}`,
+      `FROM_COMPANY: ${company.name || "WeSet"}`,
+      `FROM_ADDRESS1: ${company.address1 || ""}`,
+      `FROM_ADDRESS2: ${company.address2 || ""}`,
+      `FROM_VAT: ${company.vat || ""}`,
+      `FROM_EMAIL: ${company.email || ""}`,
+      `FROM_PHONE: ${company.phone || ""}`,
+      `TERMS: ${company.terms || "Net 15"}`,
+      `CLIENT_COMPANY: ${billTo[0] || client.company || client.contact || "Client"}`,
+      `CLIENT_CONTACT: ${billTo[1] || client.contact || ""}`,
+      `CLIENT_EMAIL: ${billTo[2] || client.email || ""}`,
+      `SHIP_TO: ${String(details.shipTo || "").replace(/\n/g, ", ")}`,
+      ...details.rows.map((row) => `ITEM: ${row.product || "Item or service"} | DESC: ${row.description || ""} | QTY: ${Number(row.qty || 1)} | RATE: ${moneyText(row.rate)} | AMOUNT: ${moneyText(Number(row.qty || 1) * Number(row.rate || 0))} | VAT: ${row.vat || details.vatLabel}`),
+      `SUBTOTAL: ${moneyText(details.subtotal)}`,
+      `VAT_LABEL: ${details.vatLabel}`,
+      `VAT_AMOUNT: ${moneyText(details.vatAmount)}`,
+      `TOTAL: ${moneyText(details.total)}`,
+      "",
+      `Hello ${client.contact || ""},`,
+      `Your ${kind.toLowerCase()} ${details.reference} is ready. The PDF is attached.`,
+      "Kind regards,",
+      company.name || "WeSet"
+    ].join("\n");
+  }
+
+  function documentHtml(kind, quote, details, client) {
+    const company = companyDetails();
+    const rows = details.rows.map((row, index) => `<tr>
+      <td>${index + 1}</td><td><strong>${escapeHtml(row.product || "Item or service")}</strong></td>
+      <td>${escapeHtml(row.description || "")}</td><td style="text-align:right">${Number(row.qty || 1)}</td>
+      <td style="text-align:right">${moneyText(row.rate)}</td><td style="text-align:right">${moneyText(Number(row.qty || 1) * Number(row.rate || 0))}</td>
+      <td style="text-align:right">${escapeHtml(row.vat || details.vatLabel)}</td>
+    </tr>`).join("");
+    return `<div style="background:#fff;color:#1d2528;font-family:Arial,Helvetica,sans-serif;margin:0 auto;max-width:900px;padding:36px 42px;">
+      <div style="display:flex;justify-content:space-between;gap:24px;"><div><h1 style="color:#0d6f9f;font-size:22px;margin:0 0 10px;">${escapeHtml(kind.toUpperCase())}</h1><strong>${escapeHtml(company.name || "WeSet")}</strong><p>${escapeHtml(company.address1 || "")}<br>${escapeHtml(company.address2 || "")}<br>${escapeHtml(company.vat || "")}</p></div><div><strong>${escapeHtml(details.reference)}</strong><p>${escapeHtml(company.email || "")}<br>${escapeHtml(company.phone || "")}</p></div></div>
+      <div style="background:#eaf3fb;display:grid;gap:24px;grid-template-columns:1fr 1fr;margin:20px -42px;padding:22px 42px;"><div><strong>Bill to</strong><p>${escapeHtml(client.company || client.contact || "Client")}<br>${escapeHtml(client.contact || "")}<br>${escapeHtml(client.email || "")}</p></div><div><strong>Ship to</strong><p>${escapeHtml(String(details.shipTo || "")).replace(/\n/g, "<br>")}</p></div></div>
+      <table style="border-collapse:collapse;font-size:12px;width:100%;"><thead><tr><th>#</th><th>Product or service</th><th>Description</th><th>Qty</th><th>Rate</th><th>Amount</th><th>VAT</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="margin-left:auto;margin-top:20px;width:280px;"><p style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong>${moneyText(details.subtotal)}</strong></p><p style="display:flex;justify-content:space-between;"><span>${escapeHtml(details.vatLabel)}</span><strong>${moneyText(details.vatAmount)}</strong></p><p style="border-top:1px solid #ccd5d8;display:flex;font-size:17px;justify-content:space-between;padding-top:12px;"><strong>Total</strong><strong>${moneyText(details.total)}</strong></p></div>
+    </div>`;
   }
 
   function fallbackPayload(kind, quote) {
     const client = getClientSafe(quote);
-    const reference = kind === "Invoice" ? `INV-${quoteRef(quote).replace(/^Q-?/i, "")}` : quoteRef(quote);
+    const details = quoteDetails(kind, quote);
+    const reference = details.reference;
     const html = `<div style="margin:0;background:#eef5f4;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#1d2528;"><div style="max-width:720px;margin:0 auto;background:#ffffff;border-radius:8px;border:1px solid #d9e0e1;overflow:hidden;"><div style="background:#145c58;color:#fff;padding:24px 28px;"><div style="display:inline-block;background:#fff;color:#145c58;border-radius:6px;padding:8px 12px;font-size:24px;font-weight:800;">WeSet</div><h1 style="margin:18px 0 0;font-size:26px;">${escapeHtml(kind)} ${escapeHtml(reference)}</h1></div><div style="padding:24px 28px;"><p>Hello ${escapeHtml(client.contact || "")},</p><p>Your WeSet ${kind.toLowerCase()} is ready. The PDF is attached.</p><p>Kind regards,<br><strong>WeSet</strong></p></div></div></div>`;
-    const text = `Hello ${client.contact || ""},\n\nYour WeSet ${kind.toLowerCase()} ${reference} is ready.\n\nThe PDF is attached.\n\nKind regards,\nWeSet`;
-    return { to: client.email || "", subject: `WeSet ${kind.toLowerCase()} ${reference}`, text, html, reference, invoiceHtml: html };
+    const text = structuredText(kind, quote, details, client);
+    return { to: client.email || "", subject: `WeSet ${kind.toLowerCase()} ${reference}`, text, html, reference, invoiceHtml: documentHtml(kind, quote, details, client) };
   }
 
   function payloadFor(kind, quote) {
-    if (kind === "Invoice" && typeof window.wesetInvoiceEmailPayload === "function") return window.wesetInvoiceEmailPayload(quote);
-    if (kind === "Quote" && typeof window.wesetQuoteEmailPayload === "function") return window.wesetQuoteEmailPayload(quote);
-    return fallbackPayload(kind, quote);
+    const complete = fallbackPayload(kind, quote);
+    const generated = kind === "Invoice" && typeof window.wesetInvoiceEmailPayload === "function"
+      ? window.wesetInvoiceEmailPayload(quote)
+      : kind === "Quote" && typeof window.wesetQuoteEmailPayload === "function"
+        ? window.wesetQuoteEmailPayload(quote)
+        : null;
+    if (!generated) return complete;
+    const hasItems = /^ITEM:/im.test(String(generated.text || ""));
+    return {
+      ...complete,
+      ...generated,
+      text: hasItems ? generated.text : complete.text,
+      invoiceHtml: generated.invoiceHtml || complete.invoiceHtml
+    };
   }
 
   function token() {
@@ -101,6 +220,7 @@
     if (!quote) return;
     const client = getClientSafe(quote);
     const payload = payloadFor(kind, quote);
+    if (!/^ITEM:/im.test(String(payload.text || ""))) throw new Error("This quote has no saved items or prices. Edit the quote and add at least one item before sending it.");
     const dialog = ensureDialog();
     dialog.querySelector("#sendPreviewTitle").textContent = kind === "Invoice" ? "Preview invoice email" : "Preview quote email";
     dialog.querySelector("#sendPreviewSub").textContent = "This is what the client will receive before you confirm sending.";
@@ -170,3 +290,4 @@
 
   window.wesetOpenSendPreview = (type, id) => openPreview(type === "invoice" ? "Invoice" : "Quote", id);
 })();
+
