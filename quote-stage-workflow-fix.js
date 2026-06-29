@@ -242,6 +242,22 @@
     return data;
   }
 
+  function documentEmailPayload(kind, quote) {
+    const builder = kind === "Invoice" ? window.wesetInvoiceEmailPayload : window.wesetQuoteEmailPayload;
+    if (typeof builder !== "function") throw new Error(`${kind} item data is not ready. Refresh the app and try again.`);
+    const payload = builder(quote);
+    if (!/^ITEM:/im.test(String(payload?.text || ""))) {
+      throw new Error(`This ${kind.toLowerCase()} has no saved item lines. Edit it and add the items before sending.`);
+    }
+    return payload;
+  }
+
+  function replaceTextField(text, field, value) {
+    const line = `${field}: ${value || ""}`;
+    const pattern = new RegExp(`^${field}:.*$`, "im");
+    return pattern.test(String(text || "")) ? String(text).replace(pattern, line) : `${line}\n${text || ""}`;
+  }
+
   function quoteEmailHtml(quote, email) {
     const client = clientById(quote.clientId);
     const totals = totalsForQuote(quote);
@@ -306,7 +322,17 @@
     button.disabled = true;
     button.textContent = "Sending...";
     try {
-      await sendPayload({ quoteId: quote.id, to: email, subject, text: message, html: parts.html, reference: quoteRef(quote), invoiceHtml: parts.pdf });
+      const documentPayload = documentEmailPayload("Quote", quote);
+      await sendPayload({
+        quoteId: quote.id,
+        ...documentPayload,
+        to: email,
+        subject,
+        html: documentPayload.html || parts.html,
+        reference: quoteRef(quote),
+        invoiceHtml: documentPayload.invoiceHtml || parts.pdf,
+        emailMessage: message
+      });
       recordQuoteSend(quote, email);
       if (typeof updateQuote === "function") updateQuote(quote.id, { status: "Sent" });
       dialog.close();
@@ -392,7 +418,19 @@
     try {
       const saved = await persistInvoice(quote, invoice, form.email, mode === "send");
       if (mode === "send") {
-        await sendPayload({ quoteId: quote.id, to: form.email, subject: `WeSet invoice ${saved.invoiceNumber}`, text: `Please find invoice ${saved.invoiceNumber} attached. Total due: ${moneyText(saved.total)}`, html: saved.html, reference: saved.invoiceNumber, invoiceHtml: saved.html });
+        const documentPayload = documentEmailPayload("Invoice", quote);
+        let documentText = replaceTextField(documentPayload.text, "REFERENCE", saved.invoiceNumber);
+        documentText = replaceTextField(documentText, "DATE", String(saved.createdAt || today()).slice(0, 10));
+        documentText = replaceTextField(documentText, "DUE_DATE", saved.dueDate || "");
+        await sendPayload({
+          quoteId: quote.id,
+          ...documentPayload,
+          to: form.email,
+          subject: `WeSet invoice ${saved.invoiceNumber}`,
+          text: documentText,
+          reference: saved.invoiceNumber,
+          invoiceHtml: saved.html
+        });
         alert(`Invoice ${saved.invoiceNumber} saved and sent to ${form.email}.`);
       } else if (mode === "print") {
         alert(`Invoice ${saved.invoiceNumber} saved. The print window will open now.`);
@@ -491,3 +529,4 @@
   observer.observe(document.body, { childList: true, subtree: true });
   scheduleTidy(500);
 })();
+
