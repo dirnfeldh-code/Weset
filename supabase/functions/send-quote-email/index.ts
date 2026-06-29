@@ -92,7 +92,7 @@ function buildPdf(payload: QuoteEmailPayload, logoBinary = "") {
     line(40, y + 14, 555, y + 14, "0.88 0.90 0.91");
   });
 
-  const totalsTop = Math.max(90, y - 6);
+  const totalsTop = Math.max(90, y - 52);
   text(360, totalsTop + 38, "Subtotal", 9);
   rightText(555, totalsTop + 38, d.subtotal, 9);
   line(360, totalsTop + 25, 555, totalsTop + 25, "0.88 0.90 0.91");
