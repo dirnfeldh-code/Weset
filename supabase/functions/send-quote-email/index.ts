@@ -54,7 +54,29 @@ function pdfEscape(value: string) {
     .replace(/[()]/g, "\\$&");
 }
 function wrapLine(line: string, max = 32) { const words = String(line || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean); const lines: string[] = []; let current = ""; for (const word of words) { if ((current + " " + word).trim().length > max) { if (current) lines.push(current); current = word; } else current = (current + " " + word).trim(); } if (current) lines.push(current); return lines.length ? lines : [""]; }
-function designedEmail(payload: QuoteEmailPayload) { if (payload.html) return removeRemoteImages(payload.html); return `<div style="margin:0;background:#eef5f4;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#1d2528;"><div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #d9e0e1;border-radius:8px;overflow:hidden;"><div style="background:#145c58;color:#ffffff;padding:24px 28px;"><div style="display:inline-block;background:#ffffff;color:#145c58;border-radius:6px;padding:8px 12px;font-size:24px;font-weight:800;line-height:1;">WeSet</div><h1 style="font-size:26px;line-height:1.2;margin:18px 0 0;">${payload.reference || "WeSet document"}</h1></div><div style="padding:24px 28px;font-size:15px;line-height:1.6;">${String(payload.text || "Please see attached PDF.").replaceAll("\n", "<br>")}</div></div></div>`; }
+function designedEmail(payload: QuoteEmailPayload, hasLogo: boolean) {
+  const d = detailsFromPayload(payload);
+  const logo = hasLogo
+    ? `<img src="cid:weset-logo" width="216" alt="WeSet - Your Office, Ready." style="display:block;width:216px;max-width:100%;height:auto;border:0;">`
+    : `<div style="font-size:30px;font-weight:800;color:#145c58;line-height:1;">we set</div><div style="font-size:12px;color:#145c58;margin-top:4px;">Your Office, Ready.</div>`;
+  return `<div style="margin:0;background:#e8f3ef;padding:28px 12px;font-family:Arial,Helvetica,sans-serif;color:#1d2528;">
+    <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #cdded8;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(20,92,88,.10);">
+      <div style="background:#f3f8f6;padding:22px 28px;border-bottom:5px solid #145c58;">${logo}</div>
+      <div style="padding:28px;font-size:15px;line-height:1.6;">
+        <h1 style="font-size:25px;line-height:1.2;margin:0 0 20px;color:#145c58;">${d.docType} ${d.reference}</h1>
+        <p style="margin:0 0 16px;">Hello ${d.clientContact || d.clientCompany || ""},</p>
+        <p style="margin:0 0 18px;">Your ${d.docType.toLowerCase()} is ready. A professionally formatted PDF is attached.</p>
+        <div style="background:#e8f3ef;border:1px solid #cfe1da;border-radius:7px;padding:16px 18px;margin:0 0 20px;">
+          <p style="margin:0 0 7px;"><strong>Reference:</strong> ${d.reference}</p>
+          <p style="margin:0 0 7px;"><strong>Site:</strong> ${d.shipTo || "Not specified"}</p>
+          <p style="margin:0;font-size:18px;color:#145c58;"><strong>Total: ${d.total}</strong></p>
+        </div>
+        <p style="margin:0;">Kind regards,<br><strong>${d.fromCompany || "WeSet"}</strong><br>${d.fromEmail || ""}<br>${d.fromPhone || ""}</p>
+      </div>
+      <div style="background:#145c58;color:#dcebe7;padding:12px 28px;font-size:12px;">Your Office, Ready.</div>
+    </div>
+  </div>`;
+}
 function buildPdf(payload: QuoteEmailPayload, logoBinary = "") {
   const d = detailsFromPayload(payload); const ops: string[] = [];
   const rect = (x: number, y: number, w: number, h: number, color: string) => ops.push("q", `${color} rg`, `${x} ${y} ${w} ${h} re f`, "Q");
@@ -62,6 +84,8 @@ function buildPdf(payload: QuoteEmailPayload, logoBinary = "") {
   const text = (x: number, y: number, value: string, size = 9, font = "F1", color = "0.114 0.145 0.157") => ops.push("BT", `${color} rg`, `/${font} ${size} Tf`, `${x} ${y} Td`, `(${pdfEscape(value)}) Tj`, "ET");
   const rightText = (x: number, y: number, value: string, size = 9, font = "F1", color = "0.114 0.145 0.157") => text(Math.max(40, x - String(value || "").length * size * 0.52), y, value, size, font, color);
 
+  rect(0, 0, 595, 842, "0.910 0.953 0.937");
+  rect(18, 18, 559, 806, "1 1 1");
   text(40, 790, d.docType.toUpperCase(), 16, "F2", "0.050 0.435 0.624");
   text(40, 770, d.fromCompany, 9, "F2"); text(40, 756, d.fromAddress1, 9); text(40, 742, d.fromAddress2, 9); text(40, 728, d.fromVat, 9);
   text(210, 764, d.fromEmail, 9); text(210, 750, d.fromPhone, 9);
@@ -69,7 +93,7 @@ function buildPdf(payload: QuoteEmailPayload, logoBinary = "") {
   if (logoBinary) ops.push("q", "180 0 0 78 353 716 cm", "/Logo Do", "Q");
   else { text(377, 762, "WeSet", 30, "F2", "0.078 0.361 0.345"); text(395, 742, "Your Office, Ready.", 10, "F1", "0.078 0.361 0.345"); }
 
-  rect(0, 592, 595, 110, "0.918 0.953 0.984");
+  rect(18, 592, 559, 110, "0.918 0.953 0.984");
   text(40, 674, "Bill to", 9, "F2"); text(40, 660, d.clientCompany, 9); text(40, 646, d.clientContact, 9); text(40, 632, d.clientEmail, 9);
   text(385, 674, "Ship to", 9, "F2"); wrapLine(d.shipTo || d.clientCompany, 34).slice(0, 4).forEach((v, i) => text(385, 660 - i * 14, v, 9));
   line(40, 596, 555, 596, "0.77 0.82 0.86");
@@ -122,7 +146,9 @@ Deno.serve(async (request) => {
     const logoResponse = await fetch("https://dirnfeldh-code.github.io/Weset/assets/weset-logo-live.jpg?pdf=20260629");
     if (logoResponse.ok) logoBinary = Array.from(new Uint8Array(await logoResponse.arrayBuffer()), (byte) => String.fromCharCode(byte)).join("");
   } catch { /* The text logo remains available if the image cannot be fetched. */ }
-  const body: Record<string, unknown> = { from: fromEmail, to: [payload.to], subject: payload.subject, text: payload.text || stripHtml(payload.html) || "Please see the attached PDF.", html: designedEmail(payload), attachments: [{ filename, content: buildPdf(payload, logoBinary), contentType: "application/pdf" }] };
+  const attachments: Array<Record<string, unknown>> = [{ filename, content: buildPdf(payload, logoBinary), contentType: "application/pdf" }];
+  if (logoBinary) attachments.push({ filename: "weset-logo.jpg", content: btoa(logoBinary), contentType: "image/jpeg", contentId: "weset-logo" });
+  const body: Record<string, unknown> = { from: fromEmail, to: [payload.to], subject: payload.subject, text: payload.text || stripHtml(payload.html) || "Please see the attached PDF.", html: designedEmail(payload, Boolean(logoBinary)), attachments };
   const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({})); if (!response.ok) return json({ error: data.message || "Email provider rejected the message.", details: data }, 502);
   return json({ ok: true, providerId: data.id || null, quoteId: payload.quoteId || null, reference: payload.reference || null, attachment: filename });
