@@ -93,9 +93,9 @@ function buildPdf(payload: QuoteEmailPayload, logoBinary = "") {
   });
 
   const totalsTop = Math.max(90, y - 6);
-  line(40, totalsTop + 54, 555, totalsTop + 54, "0.82 0.85 0.87");
   text(360, totalsTop + 38, "Subtotal", 9);
   rightText(555, totalsTop + 38, d.subtotal, 9);
+  line(360, totalsTop + 25, 555, totalsTop + 25, "0.88 0.90 0.91");
   text(360, totalsTop + 9, d.vatLabel, 9);
   rightText(555, totalsTop + 9, d.vatAmount, 9);
   line(360, totalsTop - 4, 555, totalsTop - 4, "0.82 0.85 0.87");
