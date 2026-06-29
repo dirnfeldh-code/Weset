@@ -146,8 +146,8 @@ Deno.serve(async (request) => {
     const logoResponse = await fetch("https://dirnfeldh-code.github.io/Weset/assets/weset-logo-live.jpg?pdf=20260629");
     if (logoResponse.ok) logoBinary = Array.from(new Uint8Array(await logoResponse.arrayBuffer()), (byte) => String.fromCharCode(byte)).join("");
   } catch { /* The text logo remains available if the image cannot be fetched. */ }
-  const attachments: Array<Record<string, unknown>> = [{ filename, content: buildPdf(payload, logoBinary), contentType: "application/pdf" }];
-  if (logoBinary) attachments.push({ filename: "weset-logo.jpg", content: btoa(logoBinary), contentType: "image/jpeg", contentId: "weset-logo" });
+  const attachments: Array<Record<string, unknown>> = [{ filename, content: buildPdf(payload, logoBinary), content_type: "application/pdf" }];
+  if (logoBinary) attachments.push({ filename: "weset-logo.jpg", content: btoa(logoBinary), content_type: "image/jpeg", content_id: "weset-logo" });
   const body: Record<string, unknown> = { from: fromEmail, to: [payload.to], subject: payload.subject, text: payload.text || stripHtml(payload.html) || "Please see the attached PDF.", html: designedEmail(payload, Boolean(logoBinary)), attachments };
   const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({})); if (!response.ok) return json({ error: data.message || "Email provider rejected the message.", details: data }, 502);
