@@ -168,6 +168,9 @@ function sbQuoteFromRow(row, itemRows) {
     workstations: Number(row.workstations || 1),
     requiredDate: row.required_date || "",
     items: itemRows.map(sbQuoteItemFromRow),
+    supplyTotal: Number(row.supply_total || 0),
+    servicesTotal: Number(row.services_total || 0),
+    storedTotal: Number(row.total || 0),
     notes: row.notes || "",
     status: row.status || "Draft",
     installStatus: "Not scheduled",
@@ -182,7 +185,8 @@ function sbQuoteItemFromRow(row) {
     category: "Custom",
     unitCost: Number(row.unit_cost || 0),
     unit: "each",
-    quantity: Number(row.quantity || 1)
+    quantity: Number(row.quantity || 1),
+    description: row.description || ""
   };
 }
 
