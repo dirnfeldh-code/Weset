@@ -121,13 +121,19 @@
     const loginButton = document.querySelector("#loginForm button[type='submit']");
     if (!loginButton || document.querySelector("#resetPasswordBtn")) return;
     loginButton.insertAdjacentHTML("afterend", `<button class="secondary full" id="resetPasswordBtn" type="button">Reset password</button>`);
-    document.querySelector("#resetPasswordBtn").addEventListener("click", async () => {
-      const email = document.querySelector("#loginEmail").value.trim().toLowerCase();
+    // The login script replaces the form, so listen on the document.
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("#loginForm #resetPasswordBtn");
+      if (!button || button.disabled) return;
+      const emailInput = document.querySelector("#loginEmail");
+      const email = emailInput.value.trim().toLowerCase();
       if (!email) {
         setLoginMessage("Enter your email first, then press Reset password.");
-        document.querySelector("#loginEmail").focus();
+        emailInput.focus();
         return;
       }
+      if (!emailInput.reportValidity()) return;
+      button.disabled = true;
       setLoginMessage("Sending password reset email...");
       try {
         await requestPasswordReset(email);
@@ -139,6 +145,8 @@
         } else {
           setLoginMessage(`Could not send reset email: ${text}`);
         }
+      } finally {
+        button.disabled = false;
       }
     });
   }
@@ -163,7 +171,9 @@
         <button class="primary" id="saveNewPasswordBtn" type="button">Save new password</button>
       </section>
     `);
-    document.querySelector("#saveNewPasswordBtn").addEventListener("click", async () => {
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("#loginForm #saveNewPasswordBtn");
+      if (!button || button.disabled) return;
       const password = document.querySelector("#newPassword").value;
       const confirm = document.querySelector("#confirmPassword").value;
       if (password.length < 6) {
@@ -174,14 +184,15 @@
         setLoginMessage("The two passwords do not match.");
         return;
       }
+      button.disabled = true;
       setLoginMessage("Saving new password...");
       try {
         await updatePassword(accessToken, password);
-        history.replaceState(null, "", liveUrl);
-        setLoginMessage("Password changed. Sign in with your new password.", "ok");
+        history.replaceState(null, "", location.pathname + location.search);
         location.reload();
       } catch (error) {
         setLoginMessage(`Could not change password: ${error.message || "The link may have expired."}`);
+        button.disabled = false;
       }
     });
   }
